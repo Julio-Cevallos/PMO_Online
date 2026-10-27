@@ -21,6 +21,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
 
+# Nombre del producto: único lugar en el backend. Cambiar aquí o con PROJECT_NAME en .env.
+PROJECT_NAME = os.environ.get("PROJECT_NAME", "PMO Online")
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
@@ -171,7 +174,7 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 
 # OpenAPI (drf-spectacular)
 SPECTACULAR_SETTINGS = {
-    "TITLE": "PMO Online API",
+    "TITLE": f"{PROJECT_NAME} API",
     "DESCRIPTION": "API de gestión de proyectos",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,

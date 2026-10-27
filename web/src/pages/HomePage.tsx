@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { APP_NAME } from '@/config'
 import { api } from '@/lib/api'
 import { clearTokens, getAccessToken, getRefreshToken } from '@/lib/auth'
 
@@ -49,7 +50,7 @@ export function HomePage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted px-4">
       <div className="text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">PMO Online</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{APP_NAME}</h1>
         {me.isPending && <p className="mt-2 text-muted-foreground">Cargando…</p>}
         {me.data && (
           <p className="mt-2 text-muted-foreground">

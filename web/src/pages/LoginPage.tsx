@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { AuthLayout } from '@/components/AuthLayout'
 import { FormField } from '@/components/FormField'
 import { Button } from '@/components/ui/button'
+import { APP_NAME } from '@/config'
 import { api } from '@/lib/api'
 import { saveTokens } from '@/lib/auth'
 
@@ -48,7 +49,7 @@ export function LoginPage() {
   })
 
   return (
-    <AuthLayout title="Iniciar sesión" description="Ingresa con tu cuenta de PMO Online.">
+    <AuthLayout title="Iniciar sesión" description={`Ingresa con tu cuenta de ${APP_NAME}.`}>
       <form
         className="space-y-4"
         noValidate
