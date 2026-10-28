@@ -1,4 +1,8 @@
+from datetime import timedelta
+
+from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -56,6 +60,15 @@ class RegisterTests(APITestCase):
             r = self.client.post(self.url, {"username": nombre, "email": "", "password": PASSWORD})
             self.assertEqual(r.status_code, status.HTTP_201_CREATED)
         self.assertEqual(User.objects.filter(email__isnull=True).count(), 2)
+
+    def test_registro_no_otorga_privilegios(self) -> None:
+        """D-10: quien se registra no es admin ni staff, aunque lo pida en el cuerpo."""
+        r = self.client.post(self.url, {**self.payload, "is_staff": True, "is_superuser": True})
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(username="ana")
+        self.assertFalse(user.is_staff)
+        self.assertFalse(user.is_superuser)
+        self.assertFalse(user.groups.exists())
 
     def test_correo_con_formato_invalido(self) -> None:
         r = self.client.post(self.url, {**self.payload, "email": "no-es-correo"})
@@ -204,3 +217,118 @@ class ChangePasswordTests(APITestCase):
         self.assertIn("new_password", r.data)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(PASSWORD))
+
+
+class LoginLockoutTests(APITestCase):
+    """HU-21: 3 intentos fallidos bloquean la cuenta 15 minutos."""
+
+    def setUp(self) -> None:
+        self.url = reverse("token_obtain_pair")
+        self.user = User.objects.create_user("ana", "ana@example.com", PASSWORD)
+
+    def intentar(self, password: str = "mala", username: str = "ana"):
+        return self.client.post(self.url, {"username": username, "password": password})
+
+    def bloquear(self) -> None:
+        for _ in range(3):
+            self.intentar()
+
+    def test_dos_fallos_no_bloquean(self) -> None:
+        for _ in range(2):
+            self.assertEqual(self.intentar().status_code, status.HTTP_401_UNAUTHORIZED)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.failed_attempts, 2)
+        self.assertFalse(self.user.is_locked)
+        self.assertEqual(self.intentar(PASSWORD).status_code, status.HTTP_200_OK)
+
+    def test_tercer_fallo_bloquea_por_15_minutos(self) -> None:
+        self.intentar()
+        self.intentar()
+        r = self.intentar()
+        self.assertEqual(r.status_code, status.HTTP_423_LOCKED)
+        self.assertIn("bloqueada", r.data["detail"])
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_locked)
+        esperado = timezone.now() + timedelta(minutes=15)
+        self.assertLess(abs((self.user.locked_until - esperado).total_seconds()), 5)
+
+    def test_cuenta_bloqueada_rechaza_la_clave_correcta(self) -> None:
+        self.bloquear()
+        r = self.intentar(PASSWORD)
+        self.assertEqual(r.status_code, status.HTTP_423_LOCKED)
+        self.assertNotIn("access", r.data)
+
+    def test_intentos_con_la_cuenta_bloqueada_no_extienden_el_bloqueo(self) -> None:
+        self.bloquear()
+        self.user.refresh_from_db()
+        hasta = self.user.locked_until
+        self.intentar()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.locked_until, hasta)
+
+    def test_exito_reinicia_el_contador(self) -> None:
+        self.intentar()
+        self.intentar()
+        self.assertEqual(self.intentar(PASSWORD).status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.failed_attempts, 0)
+        # Después del éxito se vuelve a tener el cupo completo.
+        self.intentar()
+        self.intentar()
+        self.assertEqual(self.intentar(PASSWORD).status_code, status.HTTP_200_OK)
+
+    def test_bloqueo_vencido_permite_entrar(self) -> None:
+        self.bloquear()
+        User.objects.filter(pk=self.user.pk).update(
+            locked_until=timezone.now() - timedelta(seconds=1)
+        )
+        self.assertEqual(self.intentar(PASSWORD).status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual((self.user.failed_attempts, self.user.locked_until), (0, None))
+
+    def test_bloqueo_vencido_empieza_el_conteo_de_cero(self) -> None:
+        self.bloquear()
+        User.objects.filter(pk=self.user.pk).update(
+            locked_until=timezone.now() - timedelta(seconds=1)
+        )
+        self.assertEqual(self.intentar().status_code, status.HTTP_401_UNAUTHORIZED)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.failed_attempts, 1)
+        self.assertFalse(self.user.is_locked)
+
+    def test_desbloqueo_manual(self) -> None:
+        self.bloquear()
+        self.user.refresh_from_db()
+        self.user.unlock()
+        self.assertEqual(self.intentar(PASSWORD).status_code, status.HTTP_200_OK)
+
+    def test_el_bloqueo_no_afecta_a_otros_usuarios(self) -> None:
+        User.objects.create_user("luis", "luis@example.com", PASSWORD)
+        self.bloquear()
+        self.assertEqual(self.intentar(PASSWORD, "luis").status_code, status.HTTP_200_OK)
+
+    def test_usuario_inexistente_da_401_sin_error(self) -> None:
+        for _ in range(5):
+            r = self.intentar(username="fantasma")
+            self.assertEqual(r.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_usuario_inactivo_no_acumula_intentos(self) -> None:
+        User.objects.filter(pk=self.user.pk).update(is_active=False)
+        for _ in range(4):
+            self.assertEqual(self.intentar().status_code, status.HTTP_401_UNAUTHORIZED)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.failed_attempts, 0)
+
+    @override_settings(LOGIN_MAX_ATTEMPTS=2, LOGIN_LOCKOUT_MINUTES=1)
+    def test_limite_y_duracion_configurables(self) -> None:
+        self.assertEqual(self.intentar().status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(self.intentar().status_code, status.HTTP_423_LOCKED)
+        self.user.refresh_from_db()
+        esperado = timezone.now() + timedelta(minutes=1)
+        self.assertLess(abs((self.user.locked_until - esperado).total_seconds()), 5)
+
+    def test_refresh_token_no_se_ve_afectado(self) -> None:
+        tokens = self.intentar(PASSWORD).data
+        self.bloquear()
+        r = self.client.post(reverse("token_refresh"), {"refresh": tokens["refresh"]})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)

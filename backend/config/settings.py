@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -53,6 +54,7 @@ INSTALLED_APPS = [
     "django_filters",
     "drf_spectacular",
     "accounts",
+    "entities",
 ]
 
 MIDDLEWARE = [
@@ -103,6 +105,11 @@ DATABASES = {
 
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
+
+# Solo al correr `manage.py test`: un hasher rápido (MD5). El real (PBKDF2) tarda ~0,4 s por
+# contraseña a propósito y las pruebas crean muchos usuarios. Nunca se usa fuera de las pruebas.
+if "test" in sys.argv[1:2]:
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -159,6 +166,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "TEST_REQUEST_DEFAULT_FORMAT": "json",  # los clientes reales (web y móvil) envían JSON
 }
 
 # JWT
@@ -166,6 +174,10 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
+
+# Bloqueo por intentos fallidos de inicio de sesión (HU-21, D-15)
+LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "3"))
+LOGIN_LOCKOUT_MINUTES = int(os.environ.get("LOGIN_LOCKOUT_MINUTES", "15"))
 
 # CORS: orígenes del front web (Vite). La app móvil no usa CORS.
 CORS_ALLOWED_ORIGINS = os.environ.get(

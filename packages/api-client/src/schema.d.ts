@@ -88,10 +88,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * @description Takes a set of user credentials and returns an access and refresh JSON web
-         *     token pair to prove the authentication of those credentials.
-         */
+        /** @description Inicio de sesión (access + refresh). 401 credenciales inválidas, 423 cuenta bloqueada. */
         post: operations["auth_token_create"];
         delete?: never;
         options?: never;
@@ -119,6 +116,356 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/entities/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
+         *
+         *     - Crear: solo el Admin (`entities.manage_entities`).
+         *     - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
+         *     - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+         */
+        get: operations["entities_list"];
+        put?: never;
+        /**
+         * @description Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
+         *
+         *     - Crear: solo el Admin (`entities.manage_entities`).
+         *     - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
+         *     - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+         */
+        post: operations["entities_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entities/{entidad_id}/members/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Miembros de una entidad.
+         *
+         *     - GET: Admin o quien tenga `entities.view_members`. Por defecto solo los activos
+         *       (`?activa=false` los inactivos, `?activa=todas` todos).
+         *     - POST: crea la cuenta de una persona nueva o suma una existente, con un rol de nivel menor
+         *       al propio (D-18). Si la persona ya fue miembro y está inactiva, se reactiva.
+         */
+        get: operations["entities_members_list"];
+        put?: never;
+        /**
+         * @description Miembros de una entidad.
+         *
+         *     - GET: Admin o quien tenga `entities.view_members`. Por defecto solo los activos
+         *       (`?activa=false` los inactivos, `?activa=todas` todos).
+         *     - POST: crea la cuenta de una persona nueva o suma una existente, con un rol de nivel menor
+         *       al propio (D-18). Si la persona ya fue miembro y está inactiva, se reactiva.
+         */
+        post: operations["entities_members_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entities/{entidad_id}/members/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Un miembro: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+         *
+         *     Hace falta un nivel mayor al del rol actual del miembro y, si se cambia el rol, al del nuevo.
+         *     Nadie modifica su propia membresía (salvo el Admin).
+         */
+        get: operations["entities_members_retrieve"];
+        put?: never;
+        post?: never;
+        /**
+         * @description Un miembro: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+         *
+         *     Hace falta un nivel mayor al del rol actual del miembro y, si se cambia el rol, al del nuevo.
+         *     Nadie modifica su propia membresía (salvo el Admin).
+         */
+        delete: operations["entities_members_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Un miembro: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+         *
+         *     Hace falta un nivel mayor al del rol actual del miembro y, si se cambia el rol, al del nuevo.
+         *     Nadie modifica su propia membresía (salvo el Admin).
+         */
+        patch: operations["entities_members_partial_update"];
+        trace?: never;
+    };
+    "/api/entities/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
+         *
+         *     - Crear: solo el Admin (`entities.manage_entities`).
+         *     - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
+         *     - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+         */
+        get: operations["entities_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * @description Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
+         *
+         *     - Crear: solo el Admin (`entities.manage_entities`).
+         *     - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
+         *     - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+         */
+        patch: operations["entities_partial_update"];
+        trace?: never;
+    };
+    "/api/entity-types/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Tipos de entidad (Proyecto, Sucursal…). Ver: Admin o miembros. Escribir: solo el Admin.
+         *
+         *     Un tipo que ya tiene entidades no se puede eliminar (se puede desactivar con `activo`).
+         */
+        get: operations["entity_types_list"];
+        put?: never;
+        /**
+         * @description Tipos de entidad (Proyecto, Sucursal…). Ver: Admin o miembros. Escribir: solo el Admin.
+         *
+         *     Un tipo que ya tiene entidades no se puede eliminar (se puede desactivar con `activo`).
+         */
+        post: operations["entity_types_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entity-types/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Tipos de entidad (Proyecto, Sucursal…). Ver: Admin o miembros. Escribir: solo el Admin.
+         *
+         *     Un tipo que ya tiene entidades no se puede eliminar (se puede desactivar con `activo`).
+         */
+        get: operations["entity_types_retrieve"];
+        put?: never;
+        post?: never;
+        /**
+         * @description Tipos de entidad (Proyecto, Sucursal…). Ver: Admin o miembros. Escribir: solo el Admin.
+         *
+         *     Un tipo que ya tiene entidades no se puede eliminar (se puede desactivar con `activo`).
+         */
+        delete: operations["entity_types_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Tipos de entidad (Proyecto, Sucursal…). Ver: Admin o miembros. Escribir: solo el Admin.
+         *
+         *     Un tipo que ya tiene entidades no se puede eliminar (se puede desactivar con `activo`).
+         */
+        patch: operations["entity_types_partial_update"];
+        trace?: never;
+    };
+    "/api/permissions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Permisos que se pueden asignar a roles, con su ámbito (`global` o `entidad`). */
+        get: operations["permissions_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roles/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
+         *
+         *     - `Admin` es del sistema y global: no se edita ni se borra.
+         *     - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+         *       pero no se renombran ni se borran.
+         *     - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
+         *       catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+         */
+        get: operations["roles_list"];
+        put?: never;
+        /**
+         * @description Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
+         *
+         *     - `Admin` es del sistema y global: no se edita ni se borra.
+         *     - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+         *       pero no se renombran ni se borran.
+         *     - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
+         *       catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+         */
+        post: operations["roles_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roles/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
+         *
+         *     - `Admin` es del sistema y global: no se edita ni se borra.
+         *     - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+         *       pero no se renombran ni se borran.
+         *     - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
+         *       catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+         */
+        get: operations["roles_retrieve"];
+        put?: never;
+        post?: never;
+        /**
+         * @description Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
+         *
+         *     - `Admin` es del sistema y global: no se edita ni se borra.
+         *     - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+         *       pero no se renombran ni se borran.
+         *     - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
+         *       catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+         */
+        delete: operations["roles_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
+         *
+         *     - `Admin` es del sistema y global: no se edita ni se borra.
+         *     - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+         *       pero no se renombran ni se borran.
+         *     - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
+         *       catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+         */
+        patch: operations["roles_partial_update"];
+        trace?: never;
+    };
+    "/api/users/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Gestión de usuarios (solo con el permiso `accounts.manage_users`, es decir, el rol Admin).
+         *
+         *     No hay DELETE: las cuentas se desactivan (`is_active`) para conservar la trazabilidad.
+         *     Los superusuarios no aparecen para el Admin (D-16).
+         */
+        get: operations["users_list"];
+        put?: never;
+        /**
+         * @description Gestión de usuarios (solo con el permiso `accounts.manage_users`, es decir, el rol Admin).
+         *
+         *     No hay DELETE: las cuentas se desactivan (`is_active`) para conservar la trazabilidad.
+         *     Los superusuarios no aparecen para el Admin (D-16).
+         */
+        post: operations["users_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Gestión de usuarios (solo con el permiso `accounts.manage_users`, es decir, el rol Admin).
+         *
+         *     No hay DELETE: las cuentas se desactivan (`is_active`) para conservar la trazabilidad.
+         *     Los superusuarios no aparecen para el Admin (D-16).
+         */
+        get: operations["users_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * @description Gestión de usuarios (solo con el permiso `accounts.manage_users`, es decir, el rol Admin).
+         *
+         *     No hay DELETE: las cuentas se desactivan (`is_active`) para conservar la trazabilidad.
+         *     Los superusuarios no aparecen para el Admin (D-16).
+         */
+        patch: operations["users_partial_update"];
+        trace?: never;
+    };
+    "/api/users/{id}/unlock/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Quita el bloqueo por intentos fallidos y reinicia el contador. */
+        post: operations["users_unlock_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -127,9 +474,148 @@ export interface components {
             old_password: string;
             new_password: string;
         };
+        /** @description Una entidad. El tipo se elige al crear y no cambia después (D-19). */
+        Entidad: {
+            readonly id: number;
+            tipo: number;
+            readonly tipo_nombre: string;
+            nombre: string;
+            /** Descripción */
+            descripcion?: string;
+            estado?: components["schemas"]["EstadoEnum"];
+            /** @description Nombre del rol del usuario en la entidad (null si no es miembro, p. ej. el Admin). */
+            readonly mi_rol: string | null;
+            readonly creado_por: number | null;
+            /** Format: date-time */
+            readonly creado_en: string;
+        };
+        /** @description Una entidad. El tipo se elige al crear y no cambia después (D-19). */
+        EntidadRequest: {
+            tipo: number;
+            nombre: string;
+            /** Descripción */
+            descripcion?: string;
+            estado?: components["schemas"]["EstadoEnum"];
+        };
+        /**
+         * @description * `activa` - Activa
+         *     * `archivada` - Archivada
+         * @enum {string}
+         */
+        EstadoEnum: "activa" | "archivada";
         /** @description Invalida (lista negra) el refresh token recibido. */
         LogoutRequest: {
             refresh: string;
+        };
+        /** @description Una membresía, con los datos básicos de la persona y su rol. */
+        Miembro: {
+            readonly id: number;
+            usuario: number;
+            readonly username: string;
+            readonly first_name: string;
+            readonly last_name: string;
+            /** Format: email */
+            readonly email: string;
+            rol: number;
+            readonly rol_nombre: string;
+            readonly nivel: number | null;
+            activa?: boolean;
+            /** Format: date-time */
+            readonly creado_en: string;
+        };
+        /** @description Una membresía, con los datos básicos de la persona y su rol. */
+        MiembroRequest: {
+            usuario: number;
+            rol: number;
+            activa?: boolean;
+        };
+        PaginatedEntidadList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Entidad"][];
+        };
+        PaginatedUserAdminList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["UserAdmin"][];
+        };
+        /** @description Una entidad. El tipo se elige al crear y no cambia después (D-19). */
+        PatchedEntidadRequest: {
+            tipo?: number;
+            nombre?: string;
+            /** Descripción */
+            descripcion?: string;
+            estado?: components["schemas"]["EstadoEnum"];
+        };
+        /** @description Cambia el rol de un miembro o lo activa o desactiva. */
+        PatchedMiembroEditarRequest: {
+            rol?: number;
+            activa?: boolean;
+        };
+        /** @description Roles (`Group`) y sus permisos. Solo `Admin` es global; los demás son por entidad (D-16). */
+        PatchedRoleRequest: {
+            /** Nombre */
+            name?: string;
+            nivel?: number | null;
+            nivel_minimo_para_asignar?: number | null;
+            permissions?: string[];
+        };
+        PatchedTipoEntidadRequest: {
+            nombre?: string;
+            /** Nombre en plural */
+            nombre_plural?: string;
+            /** Admite tareas y Gantt */
+            admite_tareas?: boolean;
+            /** Sirve de filtro de contexto en el móvil */
+            es_filtro_contexto?: boolean;
+            activo?: boolean;
+        };
+        /**
+         * @description Gestión de usuarios por el rol Admin (HU-24).
+         *
+         *     - `username` solo se define al crear; la contraseña solo se define al crear.
+         *     - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+         *     - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
+         */
+        PatchedUserAdminRequest: {
+            /**
+             * Nombre de usuario
+             * @description Requerido. 150 carácteres como máximo. Únicamente letras, dígitos y @/./+/-/_
+             */
+            username?: string;
+            /** Correo electrónico */
+            email?: (string) | null;
+            /** Nombre */
+            first_name?: string;
+            /** Apellidos */
+            last_name?: string;
+            /**
+             * Activo
+             * @description Indica si el usuario debe ser tratado como activo. Desmarque esta opción en lugar de borrar la cuenta.
+             */
+            is_active?: boolean;
+            is_admin?: boolean;
+            password?: string;
         };
         /** @description Perfil del usuario autenticado. El username no se puede cambiar. */
         PatchedUserRequest: {
@@ -139,6 +625,12 @@ export interface components {
             first_name?: string;
             /** Apellidos */
             last_name?: string;
+        };
+        /** @description Un permiso del catálogo (solo lectura). */
+        PermisoCatalogo: {
+            codename: string;
+            nombre: string;
+            ambito: string;
         };
         Register: {
             readonly id: number;
@@ -167,6 +659,47 @@ export interface components {
             first_name?: string;
             /** Apellidos */
             last_name?: string;
+        };
+        /** @description Roles (`Group`) y sus permisos. Solo `Admin` es global; los demás son por entidad (D-16). */
+        Role: {
+            readonly id: number;
+            /** Nombre */
+            name: string;
+            readonly scope: string;
+            readonly is_system: boolean;
+            nivel?: number | null;
+            nivel_minimo_para_asignar?: number | null;
+            permissions?: string[];
+        };
+        /** @description Roles (`Group`) y sus permisos. Solo `Admin` es global; los demás son por entidad (D-16). */
+        RoleRequest: {
+            /** Nombre */
+            name: string;
+            nivel?: number | null;
+            nivel_minimo_para_asignar?: number | null;
+            permissions?: string[];
+        };
+        TipoEntidad: {
+            readonly id: number;
+            nombre: string;
+            /** Nombre en plural */
+            nombre_plural: string;
+            /** Admite tareas y Gantt */
+            admite_tareas?: boolean;
+            /** Sirve de filtro de contexto en el móvil */
+            es_filtro_contexto?: boolean;
+            activo?: boolean;
+            readonly total_entidades: number;
+        };
+        TipoEntidadRequest: {
+            nombre: string;
+            /** Nombre en plural */
+            nombre_plural: string;
+            /** Admite tareas y Gantt */
+            admite_tareas?: boolean;
+            /** Sirve de filtro de contexto en el móvil */
+            es_filtro_contexto?: boolean;
+            activo?: boolean;
         };
         TokenObtainPair: {
             readonly access: string;
@@ -201,6 +734,73 @@ export interface components {
              * Format: date-time
              */
             readonly date_joined: string;
+        };
+        /**
+         * @description Gestión de usuarios por el rol Admin (HU-24).
+         *
+         *     - `username` solo se define al crear; la contraseña solo se define al crear.
+         *     - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+         *     - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
+         */
+        UserAdmin: {
+            readonly id: number;
+            /**
+             * Nombre de usuario
+             * @description Requerido. 150 carácteres como máximo. Únicamente letras, dígitos y @/./+/-/_
+             */
+            username: string;
+            /** Correo electrónico */
+            email?: (string) | null;
+            /** Nombre */
+            first_name?: string;
+            /** Apellidos */
+            last_name?: string;
+            /**
+             * Activo
+             * @description Indica si el usuario debe ser tratado como activo. Desmarque esta opción en lugar de borrar la cuenta.
+             */
+            is_active?: boolean;
+            is_admin?: boolean;
+            /** Intentos fallidos */
+            readonly failed_attempts: number;
+            /**
+             * Bloqueado hasta
+             * Format: date-time
+             */
+            readonly locked_until: string | null;
+            readonly is_locked: boolean;
+            /**
+             * Fecha de alta
+             * Format: date-time
+             */
+            readonly date_joined: string;
+        };
+        /**
+         * @description Gestión de usuarios por el rol Admin (HU-24).
+         *
+         *     - `username` solo se define al crear; la contraseña solo se define al crear.
+         *     - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+         *     - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
+         */
+        UserAdminRequest: {
+            /**
+             * Nombre de usuario
+             * @description Requerido. 150 carácteres como máximo. Únicamente letras, dígitos y @/./+/-/_
+             */
+            username: string;
+            /** Correo electrónico */
+            email?: (string) | null;
+            /** Nombre */
+            first_name?: string;
+            /** Apellidos */
+            last_name?: string;
+            /**
+             * Activo
+             * @description Indica si el usuario debe ser tratado como activo. Desmarque esta opción en lugar de borrar la cuenta.
+             */
+            is_active?: boolean;
+            is_admin?: boolean;
+            password?: string;
         };
         /** @description Perfil del usuario autenticado. El username no se puede cambiar. */
         UserRequest: {
@@ -385,6 +985,20 @@ export interface operations {
                     "application/json": components["schemas"]["TokenObtainPair"];
                 };
             };
+            /** @description Credenciales inválidas */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cuenta bloqueada por intentos fallidos */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     auth_token_refresh_create: {
@@ -409,6 +1023,576 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TokenRefresh"];
                 };
+            };
+        };
+    };
+    entities_list: {
+        parameters: {
+            query?: {
+                /**
+                 * @description * `activa` - Activa
+                 *     * `archivada` - Archivada
+                 */
+                estado?: "activa" | "archivada";
+                /** @description Un número de página dentro del conjunto de resultados paginado. */
+                page?: number;
+                tipo?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEntidadList"];
+                };
+            };
+        };
+    };
+    entities_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntidadRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entidad"];
+                };
+            };
+        };
+    };
+    entities_members_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entidad_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Miembro"][];
+                };
+            };
+        };
+    };
+    entities_members_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entidad_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MiembroRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Miembro"];
+                };
+            };
+        };
+    };
+    entities_members_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entidad_id: number;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Miembro"];
+                };
+            };
+        };
+    };
+    entities_members_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entidad_id: number;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    entities_members_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entidad_id: number;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedMiembroEditarRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Miembro"];
+                };
+            };
+        };
+    };
+    entities_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este entidad. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entidad"];
+                };
+            };
+        };
+    };
+    entities_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este entidad. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedEntidadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entidad"];
+                };
+            };
+        };
+    };
+    entity_types_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TipoEntidad"][];
+                };
+            };
+        };
+    };
+    entity_types_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TipoEntidadRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TipoEntidad"];
+                };
+            };
+        };
+    };
+    entity_types_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este tipo de entidad. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TipoEntidad"];
+                };
+            };
+        };
+    };
+    entity_types_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este tipo de entidad. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    entity_types_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este tipo de entidad. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedTipoEntidadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TipoEntidad"];
+                };
+            };
+        };
+    };
+    permissions_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermisoCatalogo"][];
+                };
+            };
+        };
+    };
+    roles_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"][];
+                };
+            };
+        };
+    };
+    roles_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+        };
+    };
+    roles_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este grupo. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+        };
+    };
+    roles_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este grupo. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    roles_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este grupo. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedRoleRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+        };
+    };
+    users_list: {
+        parameters: {
+            query?: {
+                is_active?: boolean;
+                /** @description Un número de página dentro del conjunto de resultados paginado. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedUserAdminList"];
+                };
+            };
+        };
+    };
+    users_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserAdminRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAdmin"];
+                };
+            };
+        };
+    };
+    users_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este usuario. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAdmin"];
+                };
+            };
+        };
+    };
+    users_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este usuario. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedUserAdminRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAdmin"];
+                };
+            };
+        };
+    };
+    users_unlock_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este usuario. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

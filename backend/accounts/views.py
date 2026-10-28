@@ -1,16 +1,42 @@
-from drf_spectacular.utils import extend_schema
-from rest_framework import generics, permissions, status
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import generics, mixins, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.parsers import JSONParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import User
+from .permissions import requiere_permiso
 from .serializers import (
     ChangePasswordSerializer,
+    LoginSerializer,
     LogoutSerializer,
     RegisterSerializer,
+    UserAdminSerializer,
     UserSerializer,
 )
+
+
+class LoginView(TokenObtainPairView):
+    """Inicio de sesión (access + refresh). 401 credenciales inválidas, 423 cuenta bloqueada."""
+
+    serializer_class = LoginSerializer
+
+    # El esquema sigue describiendo el serializer estándar de simplejwt (access/refresh):
+    # drf-spectacular solo conoce esa clase exacta, no la nuestra.
+    @extend_schema(
+        request=TokenObtainPairSerializer,
+        responses={
+            200: TokenObtainPairSerializer,
+            401: OpenApiResponse(description="Credenciales inválidas"),
+            423: OpenApiResponse(description="Cuenta bloqueada por intentos fallidos"),
+        },
+    )
+    def post(self, request: Request, *args, **kwargs) -> Response:
+        return super().post(request, *args, **kwargs)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -56,4 +82,39 @@ class ChangePasswordView(APIView):
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserAdminViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Gestión de usuarios (solo con el permiso `accounts.manage_users`, es decir, el rol Admin).
+
+    No hay DELETE: las cuentas se desactivan (`is_active`) para conservar la trazabilidad.
+    Los superusuarios no aparecen para el Admin (D-16).
+    """
+
+    serializer_class = UserAdminSerializer
+    permission_classes = (requiere_permiso("accounts.manage_users"),)
+    # Solo JSON: en formularios (multipart) DRF interpreta un booleano ausente como `false`
+    # y crearía cuentas inactivas sin avisar.
+    parser_classes = (JSONParser,)
+    filterset_fields = ("is_active",)
+    http_method_names = ("get", "post", "patch", "head", "options")
+
+    def get_queryset(self):
+        usuarios = User.objects.prefetch_related("groups").order_by("username")
+        if not self.request.user.is_superuser:
+            usuarios = usuarios.filter(is_superuser=False)
+        return usuarios
+
+    @extend_schema(request=None, responses={204: None})
+    @action(detail=True, methods=["post"])
+    def unlock(self, request: Request, pk: str | None = None) -> Response:
+        """Quita el bloqueo por intentos fallidos y reinicia el contador."""
+        self.get_object().unlock()
         return Response(status=status.HTTP_204_NO_CONTENT)

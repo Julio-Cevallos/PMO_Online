@@ -31,8 +31,13 @@ export function LoginPage() {
 
   const login = useMutation({
     mutationFn: async (values: FormValues) => {
-      const { data, response } = await api.POST('/api/auth/token/', { body: values })
+      const { data, error, response } = await api.POST('/api/auth/token/', { body: values })
       if (!data) {
+        // 423: cuenta bloqueada por intentos fallidos; el servidor explica cuánto falta.
+        const detalle = (error as { detail?: string } | undefined)?.detail
+        if (response.status === 423) {
+          throw new Error(detalle ?? 'Cuenta bloqueada. Inténtalo más tarde.')
+        }
         throw new Error(
           response.status === 401
             ? 'Usuario o contraseña incorrectos.'

@@ -150,9 +150,8 @@ paths:
   /api/auth/token/:
     post:
       operationId: auth_token_create
-      description: |-
-        Takes a set of user credentials and returns an access and refresh JSON web
-        token pair to prove the authentication of those credentials.
+      description: Inicio de sesión (access + refresh). 401 credenciales inválidas,
+        423 cuenta bloqueada.
       tags:
       - auth
       requestBody:
@@ -174,6 +173,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenObtainPair'
           description: ''
+        '401':
+          description: Credenciales inválidas
+        '423':
+          description: Cuenta bloqueada por intentos fallidos
   /api/auth/token/refresh/:
     post:
       operationId: auth_token_refresh_create
@@ -201,6 +204,680 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenRefresh'
           description: ''
+  /api/entities/:
+    get:
+      operationId: entities_list
+      description: |-
+        Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
+
+        - Crear: solo el Admin (`entities.manage_entities`).
+        - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
+        - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+      parameters:
+      - in: query
+        name: estado
+        schema:
+          type: string
+          enum:
+          - activa
+          - archivada
+        description: |-
+          * `activa` - Activa
+          * `archivada` - Archivada
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - in: query
+        name: tipo
+        schema:
+          type: integer
+      tags:
+      - entities
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEntidadList'
+          description: ''
+    post:
+      operationId: entities_create
+      description: |-
+        Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
+
+        - Crear: solo el Admin (`entities.manage_entities`).
+        - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
+        - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+      tags:
+      - entities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntidadRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entidad'
+          description: ''
+  /api/entities/{entidad_id}/members/:
+    get:
+      operationId: entities_members_list
+      description: |-
+        Miembros de una entidad.
+
+        - GET: Admin o quien tenga `entities.view_members`. Por defecto solo los activos
+          (`?activa=false` los inactivos, `?activa=todas` todos).
+        - POST: crea la cuenta de una persona nueva o suma una existente, con un rol de nivel menor
+          al propio (D-18). Si la persona ya fue miembro y está inactiva, se reactiva.
+      parameters:
+      - in: path
+        name: entidad_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - entities
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Miembro'
+          description: ''
+    post:
+      operationId: entities_members_create
+      description: |-
+        Miembros de una entidad.
+
+        - GET: Admin o quien tenga `entities.view_members`. Por defecto solo los activos
+          (`?activa=false` los inactivos, `?activa=todas` todos).
+        - POST: crea la cuenta de una persona nueva o suma una existente, con un rol de nivel menor
+          al propio (D-18). Si la persona ya fue miembro y está inactiva, se reactiva.
+      parameters:
+      - in: path
+        name: entidad_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - entities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MiembroRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Miembro'
+          description: ''
+  /api/entities/{entidad_id}/members/{id}/:
+    get:
+      operationId: entities_members_retrieve
+      description: |-
+        Un miembro: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+
+        Hace falta un nivel mayor al del rol actual del miembro y, si se cambia el rol, al del nuevo.
+        Nadie modifica su propia membresía (salvo el Admin).
+      parameters:
+      - in: path
+        name: entidad_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - entities
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Miembro'
+          description: ''
+    patch:
+      operationId: entities_members_partial_update
+      description: |-
+        Un miembro: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+
+        Hace falta un nivel mayor al del rol actual del miembro y, si se cambia el rol, al del nuevo.
+        Nadie modifica su propia membresía (salvo el Admin).
+      parameters:
+      - in: path
+        name: entidad_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - entities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMiembroEditarRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Miembro'
+          description: ''
+    delete:
+      operationId: entities_members_destroy
+      description: |-
+        Un miembro: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+
+        Hace falta un nivel mayor al del rol actual del miembro y, si se cambia el rol, al del nuevo.
+        Nadie modifica su propia membresía (salvo el Admin).
+      parameters:
+      - in: path
+        name: entidad_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - entities
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/entities/{id}/:
+    get:
+      operationId: entities_retrieve
+      description: |-
+        Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
+
+        - Crear: solo el Admin (`entities.manage_entities`).
+        - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
+        - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este entidad.
+        required: true
+      tags:
+      - entities
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entidad'
+          description: ''
+    patch:
+      operationId: entities_partial_update
+      description: |-
+        Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
+
+        - Crear: solo el Admin (`entities.manage_entities`).
+        - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
+        - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este entidad.
+        required: true
+      tags:
+      - entities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEntidadRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entidad'
+          description: ''
+  /api/entity-types/:
+    get:
+      operationId: entity_types_list
+      description: |-
+        Tipos de entidad (Proyecto, Sucursal…). Ver: Admin o miembros. Escribir: solo el Admin.
+
+        Un tipo que ya tiene entidades no se puede eliminar (se puede desactivar con `activo`).
+      tags:
+      - entity-types
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TipoEntidad'
+          description: ''
+    post:
+      operationId: entity_types_create
+      description: |-
+        Tipos de entidad (Proyecto, Sucursal…). Ver: Admin o miembros. Escribir: solo el Admin.
+
+        Un tipo que ya tiene entidades no se puede eliminar (se puede desactivar con `activo`).
+      tags:
+      - entity-types
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TipoEntidadRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipoEntidad'
+          description: ''
+  /api/entity-types/{id}/:
+    get:
+      operationId: entity_types_retrieve
+      description: |-
+        Tipos de entidad (Proyecto, Sucursal…). Ver: Admin o miembros. Escribir: solo el Admin.
+
+        Un tipo que ya tiene entidades no se puede eliminar (se puede desactivar con `activo`).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este tipo de entidad.
+        required: true
+      tags:
+      - entity-types
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipoEntidad'
+          description: ''
+    patch:
+      operationId: entity_types_partial_update
+      description: |-
+        Tipos de entidad (Proyecto, Sucursal…). Ver: Admin o miembros. Escribir: solo el Admin.
+
+        Un tipo que ya tiene entidades no se puede eliminar (se puede desactivar con `activo`).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este tipo de entidad.
+        required: true
+      tags:
+      - entity-types
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTipoEntidadRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipoEntidad'
+          description: ''
+    delete:
+      operationId: entity_types_destroy
+      description: |-
+        Tipos de entidad (Proyecto, Sucursal…). Ver: Admin o miembros. Escribir: solo el Admin.
+
+        Un tipo que ya tiene entidades no se puede eliminar (se puede desactivar con `activo`).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este tipo de entidad.
+        required: true
+      tags:
+      - entity-types
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/permissions/:
+    get:
+      operationId: permissions_list
+      description: Permisos que se pueden asignar a roles, con su ámbito (`global`
+        o `entidad`).
+      tags:
+      - permissions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PermisoCatalogo'
+          description: ''
+  /api/roles/:
+    get:
+      operationId: roles_list
+      description: |-
+        Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
+
+        - `Admin` es del sistema y global: no se edita ni se borra.
+        - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+          pero no se renombran ni se borran.
+        - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
+          catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+      tags:
+      - roles
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+          description: ''
+    post:
+      operationId: roles_create
+      description: |-
+        Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
+
+        - `Admin` es del sistema y global: no se edita ni se borra.
+        - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+          pero no se renombran ni se borran.
+        - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
+          catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+      tags:
+      - roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+  /api/roles/{id}/:
+    get:
+      operationId: roles_retrieve
+      description: |-
+        Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
+
+        - `Admin` es del sistema y global: no se edita ni se borra.
+        - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+          pero no se renombran ni se borran.
+        - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
+          catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este grupo.
+        required: true
+      tags:
+      - roles
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+    patch:
+      operationId: roles_partial_update
+      description: |-
+        Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
+
+        - `Admin` es del sistema y global: no se edita ni se borra.
+        - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+          pero no se renombran ni se borran.
+        - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
+          catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este grupo.
+        required: true
+      tags:
+      - roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRoleRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+    delete:
+      operationId: roles_destroy
+      description: |-
+        Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
+
+        - `Admin` es del sistema y global: no se edita ni se borra.
+        - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+          pero no se renombran ni se borran.
+        - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
+          catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este grupo.
+        required: true
+      tags:
+      - roles
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/users/:
+    get:
+      operationId: users_list
+      description: |-
+        Gestión de usuarios (solo con el permiso `accounts.manage_users`, es decir, el rol Admin).
+
+        No hay DELETE: las cuentas se desactivan (`is_active`) para conservar la trazabilidad.
+        Los superusuarios no aparecen para el Admin (D-16).
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserAdminList'
+          description: ''
+    post:
+      operationId: users_create
+      description: |-
+        Gestión de usuarios (solo con el permiso `accounts.manage_users`, es decir, el rol Admin).
+
+        No hay DELETE: las cuentas se desactivan (`is_active`) para conservar la trazabilidad.
+        Los superusuarios no aparecen para el Admin (D-16).
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAdminRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAdmin'
+          description: ''
+  /api/users/{id}/:
+    get:
+      operationId: users_retrieve
+      description: |-
+        Gestión de usuarios (solo con el permiso `accounts.manage_users`, es decir, el rol Admin).
+
+        No hay DELETE: las cuentas se desactivan (`is_active`) para conservar la trazabilidad.
+        Los superusuarios no aparecen para el Admin (D-16).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este usuario.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAdmin'
+          description: ''
+    patch:
+      operationId: users_partial_update
+      description: |-
+        Gestión de usuarios (solo con el permiso `accounts.manage_users`, es decir, el rol Admin).
+
+        No hay DELETE: las cuentas se desactivan (`is_active`) para conservar la trazabilidad.
+        Los superusuarios no aparecen para el Admin (D-16).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este usuario.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserAdminRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAdmin'
+          description: ''
+  /api/users/{id}/unlock/:
+    post:
+      operationId: users_unlock_create
+      description: Quita el bloqueo por intentos fallidos y reinicia el contador.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este usuario.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
 components:
   schemas:
     ChangePasswordRequest:
@@ -217,6 +894,74 @@ components:
       required:
       - new_password
       - old_password
+    Entidad:
+      type: object
+      description: Una entidad. El tipo se elige al crear y no cambia después (D-19).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        tipo:
+          type: integer
+        tipo_nombre:
+          type: string
+          readOnly: true
+        nombre:
+          type: string
+          maxLength: 120
+        descripcion:
+          type: string
+          title: Descripción
+        estado:
+          $ref: '#/components/schemas/EstadoEnum'
+        mi_rol:
+          type: string
+          nullable: true
+          description: Nombre del rol del usuario en la entidad (null si no es miembro,
+            p. ej. el Admin).
+          readOnly: true
+        creado_por:
+          type: integer
+          readOnly: true
+          nullable: true
+        creado_en:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - creado_en
+      - creado_por
+      - id
+      - mi_rol
+      - nombre
+      - tipo
+      - tipo_nombre
+    EntidadRequest:
+      type: object
+      description: Una entidad. El tipo se elige al crear y no cambia después (D-19).
+      properties:
+        tipo:
+          type: integer
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 120
+        descripcion:
+          type: string
+          title: Descripción
+        estado:
+          $ref: '#/components/schemas/EstadoEnum'
+      required:
+      - nombre
+      - tipo
+    EstadoEnum:
+      enum:
+      - activa
+      - archivada
+      type: string
+      description: |-
+        * `activa` - Activa
+        * `archivada` - Archivada
     LogoutRequest:
       type: object
       description: Invalida (lista negra) el refresh token recibido.
@@ -226,6 +971,226 @@ components:
           minLength: 1
       required:
       - refresh
+    Miembro:
+      type: object
+      description: Una membresía, con los datos básicos de la persona y su rol.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        usuario:
+          type: integer
+        username:
+          type: string
+          readOnly: true
+        first_name:
+          type: string
+          readOnly: true
+        last_name:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        rol:
+          type: integer
+        rol_nombre:
+          type: string
+          readOnly: true
+        nivel:
+          type: integer
+          nullable: true
+          readOnly: true
+        activa:
+          type: boolean
+        creado_en:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - creado_en
+      - email
+      - first_name
+      - id
+      - last_name
+      - nivel
+      - rol
+      - rol_nombre
+      - username
+      - usuario
+    MiembroRequest:
+      type: object
+      description: Una membresía, con los datos básicos de la persona y su rol.
+      properties:
+        usuario:
+          type: integer
+        rol:
+          type: integer
+        activa:
+          type: boolean
+      required:
+      - rol
+      - usuario
+    PaginatedEntidadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entidad'
+    PaginatedUserAdminList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserAdmin'
+    PatchedEntidadRequest:
+      type: object
+      description: Una entidad. El tipo se elige al crear y no cambia después (D-19).
+      properties:
+        tipo:
+          type: integer
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 120
+        descripcion:
+          type: string
+          title: Descripción
+        estado:
+          $ref: '#/components/schemas/EstadoEnum'
+    PatchedMiembroEditarRequest:
+      type: object
+      description: Cambia el rol de un miembro o lo activa o desactiva.
+      properties:
+        rol:
+          type: integer
+        activa:
+          type: boolean
+    PatchedRoleRequest:
+      type: object
+      description: Roles (`Group`) y sus permisos. Solo `Admin` es global; los demás
+        son por entidad (D-16).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          title: Nombre
+          maxLength: 150
+        nivel:
+          type: integer
+          maximum: 99
+          minimum: 1
+          nullable: true
+        nivel_minimo_para_asignar:
+          type: integer
+          maximum: 100
+          minimum: 2
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+            minLength: 1
+    PatchedTipoEntidadRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 80
+        nombre_plural:
+          type: string
+          minLength: 1
+          title: Nombre en plural
+          maxLength: 80
+        admite_tareas:
+          type: boolean
+          title: Admite tareas y Gantt
+        es_filtro_contexto:
+          type: boolean
+          title: Sirve de filtro de contexto en el móvil
+        activo:
+          type: boolean
+    PatchedUserAdminRequest:
+      type: object
+      description: |-
+        Gestión de usuarios por el rol Admin (HU-24).
+
+        - `username` solo se define al crear; la contraseña solo se define al crear.
+        - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+        - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          title: Nombre de usuario
+          description: 'Requerido. 150 carácteres como máximo. Únicamente letras,
+            dígitos y @/./+/-/_ '
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          nullable: true
+          title: Correo electrónico
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        first_name:
+          type: string
+          title: Nombre
+          maxLength: 150
+        last_name:
+          type: string
+          title: Apellidos
+          maxLength: 150
+        is_active:
+          type: boolean
+          title: Activo
+          description: Indica si el usuario debe ser tratado como activo. Desmarque
+            esta opción en lugar de borrar la cuenta.
+        is_admin:
+          type: boolean
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
     PatchedUserRequest:
       type: object
       description: Perfil del usuario autenticado. El username no se puede cambiar.
@@ -247,6 +1212,20 @@ components:
           type: string
           title: Apellidos
           maxLength: 150
+    PermisoCatalogo:
+      type: object
+      description: Un permiso del catálogo (solo lectura).
+      properties:
+        codename:
+          type: string
+        nombre:
+          type: string
+        ambito:
+          type: string
+      required:
+      - ambito
+      - codename
+      - nombre
     Register:
       type: object
       properties:
@@ -315,6 +1294,122 @@ components:
       required:
       - password
       - username
+    Role:
+      type: object
+      description: Roles (`Group`) y sus permisos. Solo `Admin` es global; los demás
+        son por entidad (D-16).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nombre
+          maxLength: 150
+        scope:
+          type: string
+          readOnly: true
+        is_system:
+          type: boolean
+          readOnly: true
+        nivel:
+          type: integer
+          maximum: 99
+          minimum: 1
+          nullable: true
+        nivel_minimo_para_asignar:
+          type: integer
+          maximum: 100
+          minimum: 2
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+      required:
+      - id
+      - is_system
+      - name
+      - scope
+    RoleRequest:
+      type: object
+      description: Roles (`Group`) y sus permisos. Solo `Admin` es global; los demás
+        son por entidad (D-16).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          title: Nombre
+          maxLength: 150
+        nivel:
+          type: integer
+          maximum: 99
+          minimum: 1
+          nullable: true
+        nivel_minimo_para_asignar:
+          type: integer
+          maximum: 100
+          minimum: 2
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+            minLength: 1
+      required:
+      - name
+    TipoEntidad:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        nombre:
+          type: string
+          maxLength: 80
+        nombre_plural:
+          type: string
+          title: Nombre en plural
+          maxLength: 80
+        admite_tareas:
+          type: boolean
+          title: Admite tareas y Gantt
+        es_filtro_contexto:
+          type: boolean
+          title: Sirve de filtro de contexto en el móvil
+        activo:
+          type: boolean
+        total_entidades:
+          type: integer
+          readOnly: true
+      required:
+      - id
+      - nombre
+      - nombre_plural
+      - total_entidades
+    TipoEntidadRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 80
+        nombre_plural:
+          type: string
+          minLength: 1
+          title: Nombre en plural
+          maxLength: 80
+        admite_tareas:
+          type: boolean
+          title: Admite tareas y Gantt
+        es_filtro_contexto:
+          type: boolean
+          title: Sirve de filtro de contexto en el móvil
+        activo:
+          type: boolean
+      required:
+      - nombre
+      - nombre_plural
     TokenObtainPair:
       type: object
       properties:
@@ -396,6 +1491,121 @@ components:
       required:
       - date_joined
       - id
+      - username
+    UserAdmin:
+      type: object
+      description: |-
+        Gestión de usuarios por el rol Admin (HU-24).
+
+        - `username` solo se define al crear; la contraseña solo se define al crear.
+        - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+        - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          title: Nombre de usuario
+          description: 'Requerido. 150 carácteres como máximo. Únicamente letras,
+            dígitos y @/./+/-/_ '
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          nullable: true
+          title: Correo electrónico
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        first_name:
+          type: string
+          title: Nombre
+          maxLength: 150
+        last_name:
+          type: string
+          title: Apellidos
+          maxLength: 150
+        is_active:
+          type: boolean
+          title: Activo
+          description: Indica si el usuario debe ser tratado como activo. Desmarque
+            esta opción en lugar de borrar la cuenta.
+        is_admin:
+          type: boolean
+        failed_attempts:
+          type: integer
+          readOnly: true
+          title: Intentos fallidos
+        locked_until:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: Bloqueado hasta
+        is_locked:
+          type: boolean
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Fecha de alta
+      required:
+      - date_joined
+      - failed_attempts
+      - id
+      - is_locked
+      - locked_until
+      - username
+    UserAdminRequest:
+      type: object
+      description: |-
+        Gestión de usuarios por el rol Admin (HU-24).
+
+        - `username` solo se define al crear; la contraseña solo se define al crear.
+        - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+        - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          title: Nombre de usuario
+          description: 'Requerido. 150 carácteres como máximo. Únicamente letras,
+            dígitos y @/./+/-/_ '
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          nullable: true
+          title: Correo electrónico
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        first_name:
+          type: string
+          title: Nombre
+          maxLength: 150
+        last_name:
+          type: string
+          title: Apellidos
+          maxLength: 150
+        is_active:
+          type: boolean
+          title: Activo
+          description: Indica si el usuario debe ser tratado como activo. Desmarque
+            esta opción en lugar de borrar la cuenta.
+        is_admin:
+          type: boolean
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
       - username
     UserRequest:
       type: object
