@@ -1,0 +1,6 @@
+line-length = 100
+extend-exclude = ["*/migrations"]
+
+[lint]
+# Django usa atributos de clase mutables por diseno (REQUIRED_FIELDS, etc.)
+ignore = ["RUF012"]

@@ -1,0 +1,15 @@
+{
+  "name": "@pmo/api-client",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Tipos TypeScript generados desde el OpenAPI de Django",
+  "scripts": {
+    "schema": "..\\..\\backend\\.venv\\Scripts\\python ..\\..\\backend\\manage.py spectacular --file openapi.yml",
+    "types": "openapi-typescript openapi.yml -o src/schema.d.ts",
+    "generate": "npm run schema && npm run types"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3"
+  }
+}
