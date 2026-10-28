@@ -4,6 +4,8 @@ Plataforma web y app móvil para planificar proyectos con diagramas de Gantt, ca
 
 > Estado actual: **backend** con usuarios, roles, jerarquía y entidades con miembros, y **web** con login y registro. Faltan formularios, Gantt, auditoría, sincronización, las pantallas web de administración y la app móvil.
 
+> **¿Vas a trabajar en el código?** Sigue la [guía de desarrollo](GUIA_DESARROLLO.md): herramientas a instalar, base de datos local, conexión con DBeaver, backend, web, flujo de Git y problemas frecuentes.
+
 ## Estructura
 
 ```
