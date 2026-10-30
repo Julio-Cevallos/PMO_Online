@@ -45,6 +45,18 @@ class RegisterTests(APITestCase):
         self.assertIn("password", r.data)
         self.assertEqual(User.objects.count(), 0)
 
+    def test_clave_longitud_maxima(self) -> None:
+        clave = "Zk9#" * 32
+        r = self.client.post(self.url, {**self.payload, "password": clave})
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+
+        r = self.client.post(
+            self.url,
+            {**self.payload, "username": "otra", "email": "o@example.com", "password": clave + "a"},
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", r.data)
+
     def test_faltan_campos(self) -> None:
         r = self.client.post(self.url, {})
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
@@ -217,6 +229,16 @@ class ChangePasswordTests(APITestCase):
         self.assertIn("new_password", r.data)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(PASSWORD))
+
+    def test_clave_nueva_longitud_maxima(self) -> None:
+        self.client.force_authenticate(self.user)
+        clave = "Zk9#" * 32
+        r = self.client.post(self.url, {"old_password": PASSWORD, "new_password": clave + "a"})
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("new_password", r.data)
+
+        r = self.client.post(self.url, {"old_password": PASSWORD, "new_password": clave})
+        self.assertEqual(r.status_code, status.HTTP_204_NO_CONTENT)
 
 
 class LoginLockoutTests(APITestCase):

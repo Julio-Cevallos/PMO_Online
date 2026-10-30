@@ -8,7 +8,20 @@ from django.contrib.auth.models import Group, Permission
 from django.db.models import Q
 
 ROL_ADMIN = "Admin"
-ROLES_POR_ENTIDAD = ("Responsable de entidad", "Planificador", "Operario de campo", "Auditor")
+ROL_MODERADOR = "Moderador"
+# Roles globales del sistema (no se asignan por entidad ni se editan; D-28).
+ROLES_GLOBALES = (ROL_ADMIN, ROL_MODERADOR)
+
+# Único permiso del Moderador: crear entidades (y ser dueño de las que crea).
+PERMISOS_MODERADOR = ("entities.create_entity",)
+ROLES_POR_ENTIDAD = ("Responsable de entidad", "Planificador", "Colaborador", "Auditor")
+# Roles que se asignan en un portafolio (D-29).
+ROLES_PORTAFOLIO = ("Gestor del portafolio", "Coordinador")
+# Roles del sistema con perfil (no se renombran ni se eliminan; sus permisos sí se editan).
+ROLES_CON_PERFIL = (*ROLES_POR_ENTIDAD, *ROLES_PORTAFOLIO)
+
+# Nombres anteriores de roles del sistema: se renombran al migrar (conservan miembros y permisos).
+NOMBRES_ANTERIORES = {"Operario de campo": "Colaborador"}
 
 # Niveles de los roles del sistema: (nivel, nivel mínimo para asignarlo). Ver D-18.
 # El Auditor lo asigna solo el Responsable (40) aunque el Planificador (30) tenga más nivel.
@@ -16,7 +29,9 @@ NIVELES_SISTEMA = {
     "Responsable de entidad": (40, 41),
     "Planificador": (30, 31),
     "Auditor": (20, 40),
-    "Operario de campo": (10, 11),
+    "Colaborador": (10, 11),
+    "Gestor del portafolio": (40, 41),
+    "Coordinador": (30, 31),
 }
 
 # Permisos globales: solo los tiene el rol Admin (o un superusuario). Ningún rol por entidad
@@ -51,12 +66,24 @@ def sincronizar_roles_del_sistema(**kwargs) -> None:
             globales |= Q(content_type__app_label=app, codename=codigo)
     admin, _ = Group.objects.get_or_create(name=ROL_ADMIN)
     admin.permissions.set(Permission.objects.filter(globales))
+    moderador, _ = Group.objects.get_or_create(name=ROL_MODERADOR)
+    condicion = Q()
+    for codename in PERMISOS_MODERADOR:
+        app, _, codigo = codename.partition(".")
+        condicion |= Q(content_type__app_label=app, codename=codigo)
+    moderador.permissions.set(Permission.objects.filter(condicion))
     from .models import PerfilRol  # import tardío: models importa este módulo
 
-    for nombre in ROLES_POR_ENTIDAD:
+    for antiguo, nuevo in NOMBRES_ANTERIORES.items():
+        if not Group.objects.filter(name=nuevo).exists():
+            Group.objects.filter(name=antiguo).update(name=nuevo)
+
+    for nombre in ROLES_CON_PERFIL:
         grupo, _ = Group.objects.get_or_create(name=nombre)
         nivel, minimo = NIVELES_SISTEMA[nombre]
+        ambito = "portafolio" if nombre in ROLES_PORTAFOLIO else "entidad"
         # Solo si falta: el Admin puede haber ajustado los niveles y no se pisan.
         PerfilRol.objects.get_or_create(
-            grupo=grupo, defaults={"nivel": nivel, "nivel_minimo_para_asignar": minimo}
+            grupo=grupo,
+            defaults={"nivel": nivel, "nivel_minimo_para_asignar": minimo, "ambito": ambito},
         )

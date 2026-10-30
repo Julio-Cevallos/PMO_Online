@@ -11,6 +11,7 @@ urlpatterns = [
     path("api/auth/", include("accounts.urls")),
     path("api/users/", include("accounts.users_urls")),
     path("api/roles/", include("accounts.roles_urls")),
+    path("api/audit/", include("audit.api")),
     path("api/", include("entities.urls")),
     path("api/permissions/", PermisoCatalogoView.as_view(), name="permissions"),
     path("api/auth/token/", LoginView.as_view(), name="token_obtain_pair"),

@@ -3,9 +3,10 @@ from django.db import transaction
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .catalogo import AMBITO_ENTIDAD, obtener_permiso
+from . import auditoria
+from .catalogo import AMBITO_ENTIDAD, AMBITO_PORTAFOLIO, obtener_permiso
 from .models import PerfilRol
-from .roles import ROL_ADMIN, ROLES_POR_ENTIDAD
+from .roles import ROLES_CON_PERFIL, ROLES_GLOBALES
 
 
 class PermisoCatalogoSerializer(serializers.Serializer):
@@ -34,6 +35,10 @@ class RoleSerializer(serializers.ModelSerializer):
 
     permissions = PermisosField(required=False)
     scope = serializers.SerializerMethodField()
+    # Solo al crear: dónde se asigna el rol. No se puede cambiar después.
+    ambito = serializers.ChoiceField(
+        choices=[AMBITO_ENTIDAD, AMBITO_PORTAFOLIO], write_only=True, required=False
+    )
     is_system = serializers.SerializerMethodField()
     # Jerarquía (D-18). `null` en `Admin`, que es global y no tiene perfil. Obligatorio al crear.
     nivel = serializers.IntegerField(
@@ -53,6 +58,7 @@ class RoleSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "scope",
+            "ambito",
             "is_system",
             "nivel",
             "nivel_minimo_para_asignar",
@@ -60,10 +66,13 @@ class RoleSerializer(serializers.ModelSerializer):
         )
 
     def get_scope(self, obj: Group) -> str:
-        return "global" if obj.name == ROL_ADMIN else "entidad"
+        if obj.name in ROLES_GLOBALES:
+            return "global"
+        perfil = getattr(obj, "perfil", None)
+        return perfil.ambito if perfil else "entidad"
 
     def get_is_system(self, obj: Group) -> bool:
-        return obj.name == ROL_ADMIN or obj.name in ROLES_POR_ENTIDAD
+        return obj.name in ROLES_GLOBALES or obj.name in ROLES_CON_PERFIL
 
     def validate_name(self, value: str) -> str:
         value = value.strip()
@@ -76,7 +85,7 @@ class RoleSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Ya existe un rol con ese nombre.")
         if (
             self.instance is not None
-            and self.instance.name in ROLES_POR_ENTIDAD
+            and self.instance.name in ROLES_CON_PERFIL
             and value != self.instance.name
         ):
             raise serializers.ValidationError("Un rol del sistema no se puede renombrar.")
@@ -115,7 +124,26 @@ class RoleSerializer(serializers.ModelSerializer):
             )
         if datos or actual is None:
             attrs["perfil"] = {"nivel": nivel, "nivel_minimo_para_asignar": minimo}
+        self._validar_ambito_de_permisos(attrs, actual)
         return attrs
+
+    def _validar_ambito_de_permisos(self, attrs: dict, actual: PerfilRol | None) -> None:
+        """Un rol solo recibe permisos de su ámbito (entidad o portafolio)."""
+        ambito = actual.ambito if actual is not None else attrs.get("ambito", AMBITO_ENTIDAD)
+        if actual is not None and attrs.get("ambito", ambito) != ambito:
+            raise serializers.ValidationError(
+                {"ambito": "El ámbito de un rol no se puede cambiar."}
+            )
+        errores = []
+        for permiso in attrs.get("permissions", []):
+            codename = f"{permiso.content_type.app_label}.{permiso.codename}"
+            definicion = obtener_permiso(codename)
+            if definicion is not None and definicion.ambito != ambito:
+                errores.append(
+                    f"{codename}: es un permiso de {definicion.ambito} y este rol es de {ambito}."
+                )
+        if errores:
+            raise serializers.ValidationError({"permissions": errores})
 
     def validate_permissions(self, value: list[str]) -> list[Permission]:
         errores: list[str] = []
@@ -125,10 +153,8 @@ class RoleSerializer(serializers.ModelSerializer):
             if definicion is None:
                 errores.append(f"{codename}: no está en el catálogo de permisos.")
                 continue
-            if definicion.ambito != AMBITO_ENTIDAD:
-                errores.append(
-                    f"{codename}: es un permiso global y no se asigna a roles por entidad."
-                )
+            if definicion.ambito not in (AMBITO_ENTIDAD, AMBITO_PORTAFOLIO):
+                errores.append(f"{codename}: es un permiso global y solo lo tiene el Admin.")
                 continue
             app, _, codigo = codename.partition(".")
             permiso = Permission.objects.filter(
@@ -153,18 +179,25 @@ class RoleSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict) -> Group:
         permisos = validated_data.pop("permissions", [])
         perfil = validated_data.pop("perfil")
+        ambito = validated_data.pop("ambito", AMBITO_ENTIDAD)
         grupo = Group.objects.create(**validated_data)
         grupo.permissions.set(permisos)
-        PerfilRol.objects.create(grupo=grupo, **perfil)
-        return self._recargar(grupo)
+        PerfilRol.objects.create(grupo=grupo, ambito=ambito, **perfil)
+        grupo = self._recargar(grupo)
+        auditoria.rol_creado(self.context["request"], grupo)
+        return grupo
 
     @transaction.atomic
     def update(self, instance: Group, validated_data: dict) -> Group:
         permisos = validated_data.pop("permissions", None)
         perfil = validated_data.pop("perfil", None)
+        validated_data.pop("ambito", None)
+        antes = auditoria.foto_rol(instance)
         grupo = super().update(instance, validated_data)
         if permisos is not None:
             grupo.permissions.set(permisos)
         if perfil is not None:
             PerfilRol.objects.update_or_create(grupo=grupo, defaults=perfil)
-        return self._recargar(grupo)
+        grupo = self._recargar(grupo)
+        auditoria.rol_editado(self.context["request"], grupo, antes)
+        return grupo

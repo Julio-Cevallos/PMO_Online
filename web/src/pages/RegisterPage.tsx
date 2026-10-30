@@ -9,10 +9,15 @@ import { FormField } from '@/components/FormField'
 import { Button } from '@/components/ui/button'
 import { APP_NAME } from '@/config'
 import { api, firstMessage, type ApiErrors } from '@/lib/api'
+import { MENSAJE_USUARIO, REGEX_USUARIO } from '@/lib/usuario'
 
 const schema = z
   .object({
-    username: z.string().min(1, 'Elige un nombre de usuario').max(150),
+    username: z
+      .string()
+      .min(1, 'Elige un nombre de usuario')
+      .max(150)
+      .regex(REGEX_USUARIO, MENSAJE_USUARIO),
     email: z.union([z.literal(''), z.email('Ingresa un correo válido')]),
     password: z.string().min(8, 'Mínimo 8 caracteres'),
     confirmPassword: z.string().min(1, 'Repite la contraseña'),

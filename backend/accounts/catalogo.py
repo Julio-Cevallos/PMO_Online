@@ -3,6 +3,7 @@
 Cada permiso declara su ámbito:
 - `global`: solo lo tiene el rol Admin (o un superusuario); nunca se asigna a roles por entidad.
 - `entidad`: se cumple dentro de una entidad si el rol de la membresía lo incluye.
+- `portafolio`: se cumple dentro de un portafolio si el rol de su membresía lo incluye (D-29).
 
 Cada módulo registra los suyos al construirse (en `AppConfig.ready`), por ejemplo:
 
@@ -18,7 +19,8 @@ from .roles import PERMISOS_GLOBALES
 
 AMBITO_GLOBAL = "global"
 AMBITO_ENTIDAD = "entidad"
-_AMBITOS = (AMBITO_GLOBAL, AMBITO_ENTIDAD)
+AMBITO_PORTAFOLIO = "portafolio"
+_AMBITOS = (AMBITO_GLOBAL, AMBITO_ENTIDAD, AMBITO_PORTAFOLIO)
 
 
 @dataclass(frozen=True)

@@ -11,8 +11,9 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from . import auditoria
 from .models import User
-from .roles import ROL_ADMIN
+from .roles import ROL_ADMIN, ROL_MODERADOR
 
 
 class AccountLocked(APIException):
@@ -61,9 +62,11 @@ class LoginSerializer(TokenObtainPairSerializer):
                     error = exc
                     if user is not None and user.is_active and user.register_failed_login():
                         locked_user = user
+                        auditoria.cuenta_bloqueada(self.context.get("request"), user)
                 else:
                     if user is not None:
                         user.unlock()
+                        auditoria.inicio_sesion(self.context.get("request"), user)
 
         if locked_user is not None:
             raise AccountLocked(locked_user)
@@ -84,7 +87,9 @@ def normalizar_correo(value: str | None, excluir_pk: int | None = None) -> str |
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    password = serializers.CharField(
+        write_only=True, max_length=128, style={"input_type": "password"}
+    )
 
     class Meta:
         model = User
@@ -125,7 +130,9 @@ class LogoutSerializer(serializers.Serializer):
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True, style={"input_type": "password"})
-    new_password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    new_password = serializers.CharField(
+        write_only=True, max_length=128, style={"input_type": "password"}
+    )
 
     def validate_old_password(self, value: str) -> str:
         if not self.context["request"].user.check_password(value):
@@ -159,13 +166,15 @@ class UserAdminSerializer(serializers.ModelSerializer):
 
     - `username` solo se define al crear; la contraseña solo se define al crear.
     - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+    - `is_moderator` (rol global Moderador, D-28) lo cambia quien gestiona usuarios (Admin o superusuario).
     - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
     """
 
     password = serializers.CharField(
-        write_only=True, required=False, style={"input_type": "password"}
+        write_only=True, required=False, max_length=128, style={"input_type": "password"}
     )
     is_admin = serializers.BooleanField(required=False)
+    is_moderator = serializers.BooleanField(required=False)
     is_locked = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -178,6 +187,7 @@ class UserAdminSerializer(serializers.ModelSerializer):
             "last_name",
             "is_active",
             "is_admin",
+            "is_moderator",
             "password",
             "failed_attempts",
             "locked_until",
@@ -204,7 +214,9 @@ class UserAdminSerializer(serializers.ModelSerializer):
         if self.instance is None:
             if "password" not in attrs:
                 raise serializers.ValidationError({"password": "Este campo es requerido."})
-            datos = {k: v for k, v in attrs.items() if k not in ("password", "is_admin")}
+            datos = {
+                k: v for k, v in attrs.items() if k not in ("password", "is_admin", "is_moderator")
+            }
             try:
                 validate_password(attrs["password"], User(**datos))
             except DjangoValidationError as exc:
@@ -220,25 +232,33 @@ class UserAdminSerializer(serializers.ModelSerializer):
             )
         return attrs
 
-    def _asignar_rol_admin(self, user: User, es_admin: bool | None) -> None:
-        if es_admin is None:
+    def _asignar_rol(self, user: User, nombre: str, tiene: bool | None) -> None:
+        if tiene is None:
             return
-        grupo = Group.objects.get(name=ROL_ADMIN)
-        if es_admin:
+        grupo = Group.objects.get(name=nombre)
+        if tiene:
             user.groups.add(grupo)
         else:
             user.groups.remove(grupo)
 
+    def _asignar_roles_globales(self, user: User, datos: dict) -> None:
+        self._asignar_rol(user, ROL_ADMIN, datos.pop("is_admin", None))
+        self._asignar_rol(user, ROL_MODERADOR, datos.pop("is_moderator", None))
+
     @transaction.atomic
     def create(self, validated_data: dict) -> User:
-        es_admin = validated_data.pop("is_admin", None)
+        roles = {c: validated_data.pop(c, None) for c in ("is_admin", "is_moderator")}
         user = User.objects.create_user(**validated_data)
-        self._asignar_rol_admin(user, es_admin)
+        self._asignar_roles_globales(user, roles)
+        auditoria.usuario_creado(self.context["request"], User.objects.get(pk=user.pk))
         return user
 
     @transaction.atomic
     def update(self, instance: User, validated_data: dict) -> User:
-        es_admin = validated_data.pop("is_admin", None)
+        roles = {c: validated_data.pop(c, None) for c in ("is_admin", "is_moderator")}
+        antes = auditoria.foto_usuario(instance)
         user = super().update(instance, validated_data)
-        self._asignar_rol_admin(user, es_admin)
-        return User.objects.prefetch_related("groups").get(pk=user.pk)
+        self._asignar_roles_globales(user, roles)
+        recargado = User.objects.prefetch_related("groups").get(pk=user.pk)
+        auditoria.usuario_editado(self.context["request"], recargado, antes)
+        return recargado

@@ -4,6 +4,50 @@
  */
 
 export interface paths {
+    "/api/audit/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Historial de auditoría: solo lectura, del más reciente al más antiguo, paginado.
+         *
+         *     Cada persona ve solo lo que le corresponde (ver `audit/visibilidad.py`). Un evento fuera de
+         *     su alcance responde 404.
+         */
+        get: operations["audit_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audit/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Historial de auditoría: solo lectura, del más reciente al más antiguo, paginado.
+         *
+         *     Cada persona ve solo lo que le corresponde (ver `audit/visibilidad.py`). Un evento fuera de
+         *     su alcance responde 404.
+         */
+        get: operations["audit_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/logout/": {
         parameters: {
             query?: never;
@@ -33,15 +77,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Perfil del usuario autenticado (GET, PUT, PATCH). */
+        /** @description Perfil del usuario autenticado (GET, PUT, PATCH), con su rol global y permisos. */
         get: operations["auth_me_retrieve"];
-        /** @description Perfil del usuario autenticado (GET, PUT, PATCH). */
+        /** @description Perfil del usuario autenticado (GET, PUT, PATCH), con su rol global y permisos. */
         put: operations["auth_me_update"];
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** @description Perfil del usuario autenticado (GET, PUT, PATCH). */
+        /** @description Perfil del usuario autenticado (GET, PUT, PATCH), con su rol global y permisos. */
         patch: operations["auth_me_partial_update"];
         trace?: never;
     };
@@ -126,21 +170,120 @@ export interface paths {
         /**
          * @description Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
          *
-         *     - Crear: solo el Admin (`entities.manage_entities`).
-         *     - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
-         *     - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+         *     - Cada entidad pertenece a un portafolio (D-29). Se ven las propias (membresía) y las de los
+         *       portafolios donde se tiene permiso de verlas; el Admin ve todas.
+         *     - Crear: Admin, Moderador (en su portafolio personal si no elige otro) o quien tenga
+         *       `create_portfolio_entities` en el portafolio elegido.
+         *     - Editar nombre y descripción: quien tenga `edit_portfolio_entities` en el portafolio o
+         *       `entities.edit_entity` en ella.
+         *     - Archivar o reactivar (`estado`) y mover (`/move/`): según permisos del portafolio. No hay DELETE.
          */
         get: operations["entities_list"];
         put?: never;
         /**
          * @description Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
          *
-         *     - Crear: solo el Admin (`entities.manage_entities`).
-         *     - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
-         *     - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+         *     - Cada entidad pertenece a un portafolio (D-29). Se ven las propias (membresía) y las de los
+         *       portafolios donde se tiene permiso de verlas; el Admin ve todas.
+         *     - Crear: Admin, Moderador (en su portafolio personal si no elige otro) o quien tenga
+         *       `create_portfolio_entities` en el portafolio elegido.
+         *     - Editar nombre y descripción: quien tenga `edit_portfolio_entities` en el portafolio o
+         *       `entities.edit_entity` en ella.
+         *     - Archivar o reactivar (`estado`) y mover (`/move/`): según permisos del portafolio. No hay DELETE.
          */
         post: operations["entities_create"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entities/{entidad_id}/assignable-roles/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Roles que quien consulta puede asignar en la entidad (D-18), del de más nivel al de menos.
+         *
+         *     Sirve para llenar el selector de rol al agregar o cambiar miembros: quien no es Admin no
+         *     puede listar todos los roles (`/api/roles/`).
+         */
+        get: operations["entities_assignable_roles_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entities/{entidad_id}/candidates/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Busca cuentas para sumar a la entidad (`?q=` por usuario, nombre o apellido).
+         *
+         *     Devuelve como máximo 10, ordenadas por usuario. El Admin busca entre todas las cuentas
+         *     (menos superusuarios); los demás, solo entre quienes comparten con ellos otra entidad.
+         */
+        get: operations["entities_candidates_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entities/{entidad_id}/invitations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Invitaciones de una entidad.
+         *
+         *     - GET: quien puede ver miembros. Por defecto las pendientes (`?estado=` otro estado o `todas`).
+         *     - POST: invita a una cuenta que ya existe, con un rol de nivel menor al propio (D-18).
+         *       La persona la acepta o rechaza desde `/api/invitations/`.
+         */
+        get: operations["entities_invitations_list"];
+        put?: never;
+        /**
+         * @description Invitaciones de una entidad.
+         *
+         *     - GET: quien puede ver miembros. Por defecto las pendientes (`?estado=` otro estado o `todas`).
+         *     - POST: invita a una cuenta que ya existe, con un rol de nivel menor al propio (D-18).
+         *       La persona la acepta o rechaza desde `/api/invitations/`.
+         */
+        post: operations["entities_invitations_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entities/{entidad_id}/invitations/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Cancela una invitación pendiente (`DELETE`): la invitación se conserva como cancelada. */
+        delete: operations["entities_invitations_destroy"];
         options?: never;
         head?: never;
         patch?: never;
@@ -158,8 +301,8 @@ export interface paths {
          *
          *     - GET: Admin o quien tenga `entities.view_members`. Por defecto solo los activos
          *       (`?activa=false` los inactivos, `?activa=todas` todos).
-         *     - POST: crea la cuenta de una persona nueva o suma una existente, con un rol de nivel menor
-         *       al propio (D-18). Si la persona ya fue miembro y está inactiva, se reactiva.
+         *     - POST: crea la cuenta de una persona nueva y la suma con un rol de nivel menor al propio
+         *       (D-18). Para una cuenta que ya existe se usa una invitación (`/invitations/`, D-27).
          */
         get: operations["entities_members_list"];
         put?: never;
@@ -168,8 +311,8 @@ export interface paths {
          *
          *     - GET: Admin o quien tenga `entities.view_members`. Por defecto solo los activos
          *       (`?activa=false` los inactivos, `?activa=todas` todos).
-         *     - POST: crea la cuenta de una persona nueva o suma una existente, con un rol de nivel menor
-         *       al propio (D-18). Si la persona ya fue miembro y está inactiva, se reactiva.
+         *     - POST: crea la cuenta de una persona nueva y la suma con un rol de nivel menor al propio
+         *       (D-18). Para una cuenta que ya existe se usa una invitación (`/invitations/`, D-27).
          */
         post: operations["entities_members_create"];
         delete?: never;
@@ -222,9 +365,13 @@ export interface paths {
         /**
          * @description Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
          *
-         *     - Crear: solo el Admin (`entities.manage_entities`).
-         *     - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
-         *     - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+         *     - Cada entidad pertenece a un portafolio (D-29). Se ven las propias (membresía) y las de los
+         *       portafolios donde se tiene permiso de verlas; el Admin ve todas.
+         *     - Crear: Admin, Moderador (en su portafolio personal si no elige otro) o quien tenga
+         *       `create_portfolio_entities` en el portafolio elegido.
+         *     - Editar nombre y descripción: quien tenga `edit_portfolio_entities` en el portafolio o
+         *       `entities.edit_entity` en ella.
+         *     - Archivar o reactivar (`estado`) y mover (`/move/`): según permisos del portafolio. No hay DELETE.
          */
         get: operations["entities_retrieve"];
         put?: never;
@@ -235,11 +382,35 @@ export interface paths {
         /**
          * @description Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
          *
-         *     - Crear: solo el Admin (`entities.manage_entities`).
-         *     - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
-         *     - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+         *     - Cada entidad pertenece a un portafolio (D-29). Se ven las propias (membresía) y las de los
+         *       portafolios donde se tiene permiso de verlas; el Admin ve todas.
+         *     - Crear: Admin, Moderador (en su portafolio personal si no elige otro) o quien tenga
+         *       `create_portfolio_entities` en el portafolio elegido.
+         *     - Editar nombre y descripción: quien tenga `edit_portfolio_entities` en el portafolio o
+         *       `entities.edit_entity` en ella.
+         *     - Archivar o reactivar (`estado`) y mover (`/move/`): según permisos del portafolio. No hay DELETE.
          */
         patch: operations["entities_partial_update"];
+        trace?: never;
+    };
+    "/api/entities/{id}/move/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Cambia la entidad de portafolio: hace falta poder moverla en el origen y crear
+         *     entidades en el destino (el Admin puede con cualquiera).
+         */
+        post: operations["entities_move_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/entity-types/": {
@@ -299,6 +470,57 @@ export interface paths {
         patch: operations["entity_types_partial_update"];
         trace?: never;
     };
+    "/api/invitations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Invitaciones pendientes de quien consulta (para aceptarlas o rechazarlas). */
+        get: operations["invitations_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invitations/{id}/accept/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Acepta: se crea (o reactiva) la membresía con el rol de la invitación. */
+        post: operations["invitations_accept_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invitations/{id}/reject/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Rechaza: no se crea ninguna membresía. */
+        post: operations["invitations_reject_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/permissions/": {
         parameters: {
             query?: never;
@@ -316,6 +538,244 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio-invitations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Invitaciones a portafolios pendientes de quien consulta. */
+        get: operations["portfolio_invitations_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio-invitations/{id}/accept/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Acepta: se crea (o reactiva) la membresía con el rol de la invitación. */
+        post: operations["portfolio_invitations_accept_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio-invitations/{id}/reject/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Rechaza: no se crea ninguna membresía. */
+        post: operations["portfolio_invitations_reject_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolios/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Portafolios: grupos de entidades gestionados en conjunto (D-29).
+         *
+         *     - Cada persona ve aquellos donde es miembro; el Admin ve todos.
+         *     - Crear: Admin o Moderador (`entities.create_entity`). Quien crea queda como Gestor.
+         *     - Editar y eliminar (solo si está vacío y no es personal): `entities.edit_portfolio`.
+         */
+        get: operations["portfolios_list"];
+        put?: never;
+        /**
+         * @description Portafolios: grupos de entidades gestionados en conjunto (D-29).
+         *
+         *     - Cada persona ve aquellos donde es miembro; el Admin ve todos.
+         *     - Crear: Admin o Moderador (`entities.create_entity`). Quien crea queda como Gestor.
+         *     - Editar y eliminar (solo si está vacío y no es personal): `entities.edit_portfolio`.
+         */
+        post: operations["portfolios_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolios/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Portafolios: grupos de entidades gestionados en conjunto (D-29).
+         *
+         *     - Cada persona ve aquellos donde es miembro; el Admin ve todos.
+         *     - Crear: Admin o Moderador (`entities.create_entity`). Quien crea queda como Gestor.
+         *     - Editar y eliminar (solo si está vacío y no es personal): `entities.edit_portfolio`.
+         */
+        get: operations["portfolios_retrieve"];
+        put?: never;
+        post?: never;
+        /**
+         * @description Portafolios: grupos de entidades gestionados en conjunto (D-29).
+         *
+         *     - Cada persona ve aquellos donde es miembro; el Admin ve todos.
+         *     - Crear: Admin o Moderador (`entities.create_entity`). Quien crea queda como Gestor.
+         *     - Editar y eliminar (solo si está vacío y no es personal): `entities.edit_portfolio`.
+         */
+        delete: operations["portfolios_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Portafolios: grupos de entidades gestionados en conjunto (D-29).
+         *
+         *     - Cada persona ve aquellos donde es miembro; el Admin ve todos.
+         *     - Crear: Admin o Moderador (`entities.create_entity`). Quien crea queda como Gestor.
+         *     - Editar y eliminar (solo si está vacío y no es personal): `entities.edit_portfolio`.
+         */
+        patch: operations["portfolios_partial_update"];
+        trace?: never;
+    };
+    "/api/portfolios/{portafolio_id}/assignable-roles/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Roles de portafolio que quien consulta puede asignar (nivel igual o menor al propio). */
+        get: operations["portfolios_assignable_roles_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolios/{portafolio_id}/invitations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Invitaciones de un portafolio.
+         *
+         *     - GET: quien ve sus miembros. Por defecto las pendientes (`?estado=` otro estado o `todas`).
+         *     - POST: invita a una cuenta que ya existe con un rol de portafolio de nivel igual o menor al
+         *       propio. La persona la acepta o rechaza desde `/api/portfolio-invitations/`.
+         */
+        get: operations["portfolios_invitations_list"];
+        put?: never;
+        /**
+         * @description Invitaciones de un portafolio.
+         *
+         *     - GET: quien ve sus miembros. Por defecto las pendientes (`?estado=` otro estado o `todas`).
+         *     - POST: invita a una cuenta que ya existe con un rol de portafolio de nivel igual o menor al
+         *       propio. La persona la acepta o rechaza desde `/api/portfolio-invitations/`.
+         */
+        post: operations["portfolios_invitations_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolios/{portafolio_id}/invitations/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Cancela una invitación pendiente (`DELETE`): queda como cancelada. */
+        delete: operations["portfolios_invitations_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolios/{portafolio_id}/members/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Miembros de un portafolio. Quien lo ve puede ver sus miembros.
+         *
+         *     Por defecto solo los activos (`?activa=false` los inactivos, `?activa=todas` todos). Se suman
+         *     por invitación (`/invitations/`).
+         */
+        get: operations["portfolios_members_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolios/{portafolio_id}/members/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Un miembro del portafolio: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+         *
+         *     Hace falta `entities.manage_portfolio_members` y un nivel igual o mayor al del rol. Nadie
+         *     modifica su propia membresía (salvo el Admin) y el portafolio conserva siempre un Gestor activo.
+         */
+        get: operations["portfolios_members_retrieve"];
+        put?: never;
+        post?: never;
+        /**
+         * @description Un miembro del portafolio: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+         *
+         *     Hace falta `entities.manage_portfolio_members` y un nivel igual o mayor al del rol. Nadie
+         *     modifica su propia membresía (salvo el Admin) y el portafolio conserva siempre un Gestor activo.
+         */
+        delete: operations["portfolios_members_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Un miembro del portafolio: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+         *
+         *     Hace falta `entities.manage_portfolio_members` y un nivel igual o mayor al del rol. Nadie
+         *     modifica su propia membresía (salvo el Admin) y el portafolio conserva siempre un Gestor activo.
+         */
+        patch: operations["portfolios_members_partial_update"];
+        trace?: never;
+    };
     "/api/roles/": {
         parameters: {
             query?: never;
@@ -326,22 +786,24 @@ export interface paths {
         /**
          * @description Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
          *
-         *     - `Admin` es del sistema y global: no se edita ni se borra.
-         *     - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+         *     - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+         *     - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+         *       `Coordinador`) son del sistema: se editan sus permisos,
          *       pero no se renombran ni se borran.
-         *     - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-         *       catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+         *     - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+         *       reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
          */
         get: operations["roles_list"];
         put?: never;
         /**
          * @description Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
          *
-         *     - `Admin` es del sistema y global: no se edita ni se borra.
-         *     - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+         *     - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+         *     - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+         *       `Coordinador`) son del sistema: se editan sus permisos,
          *       pero no se renombran ni se borran.
-         *     - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-         *       catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+         *     - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+         *       reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
          */
         post: operations["roles_create"];
         delete?: never;
@@ -360,11 +822,12 @@ export interface paths {
         /**
          * @description Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
          *
-         *     - `Admin` es del sistema y global: no se edita ni se borra.
-         *     - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+         *     - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+         *     - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+         *       `Coordinador`) son del sistema: se editan sus permisos,
          *       pero no se renombran ni se borran.
-         *     - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-         *       catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+         *     - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+         *       reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
          */
         get: operations["roles_retrieve"];
         put?: never;
@@ -372,11 +835,12 @@ export interface paths {
         /**
          * @description Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
          *
-         *     - `Admin` es del sistema y global: no se edita ni se borra.
-         *     - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+         *     - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+         *     - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+         *       `Coordinador`) son del sistema: se editan sus permisos,
          *       pero no se renombran ni se borran.
-         *     - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-         *       catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+         *     - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+         *       reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
          */
         delete: operations["roles_destroy"];
         options?: never;
@@ -384,11 +848,12 @@ export interface paths {
         /**
          * @description Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
          *
-         *     - `Admin` es del sistema y global: no se edita ni se borra.
-         *     - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+         *     - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+         *     - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+         *       `Coordinador`) son del sistema: se editan sus permisos,
          *       pero no se renombran ni se borran.
-         *     - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-         *       catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+         *     - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+         *       reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
          */
         patch: operations["roles_partial_update"];
         trace?: never;
@@ -470,6 +935,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description * `entidad` - entidad
+         *     * `portafolio` - portafolio
+         * @enum {string}
+         */
+        AmbitoEnum: "entidad" | "portafolio";
+        /** @description Una cuenta que se puede sumar a la entidad (resultado de la búsqueda). */
+        Candidato: {
+            id: number;
+            username: string;
+            first_name: string;
+            last_name: string;
+        };
+        /**
+         * @description * `sistema` - Sistema
+         *     * `entidad` - Entidad
+         *     * `contenido` - Contenido
+         * @enum {string}
+         */
+        CategoriaEnum: "sistema" | "entidad" | "contenido";
         ChangePasswordRequest: {
             old_password: string;
             new_password: string;
@@ -479,33 +964,167 @@ export interface components {
             readonly id: number;
             tipo: number;
             readonly tipo_nombre: string;
+            portafolio?: number;
+            readonly portafolio_nombre: string;
             nombre: string;
             /** Descripción */
             descripcion?: string;
-            estado?: components["schemas"]["EstadoEnum"];
+            estado?: components["schemas"]["EntidadEstadoEnum"];
             /** @description Nombre del rol del usuario en la entidad (null si no es miembro, p. ej. el Admin). */
             readonly mi_rol: string | null;
+            readonly puede_editar: boolean;
+            readonly puede_ver_miembros: boolean;
+            readonly puede_gestionar_miembros: boolean;
+            readonly puede_ver_historial: boolean;
+            readonly puede_archivar: boolean;
+            readonly puede_mover: boolean;
             readonly creado_por: number | null;
             /** Format: date-time */
             readonly creado_en: string;
-        };
-        /** @description Una entidad. El tipo se elige al crear y no cambia después (D-19). */
-        EntidadRequest: {
-            tipo: number;
-            nombre: string;
-            /** Descripción */
-            descripcion?: string;
-            estado?: components["schemas"]["EstadoEnum"];
         };
         /**
          * @description * `activa` - Activa
          *     * `archivada` - Archivada
          * @enum {string}
          */
-        EstadoEnum: "activa" | "archivada";
+        EntidadEstadoEnum: "activa" | "archivada";
+        /** @description Una entidad. El tipo se elige al crear y no cambia después (D-19). */
+        EntidadRequest: {
+            tipo: number;
+            portafolio?: number;
+            nombre: string;
+            /** Descripción */
+            descripcion?: string;
+            estado?: components["schemas"]["EntidadEstadoEnum"];
+        };
+        /**
+         * @description * `pendiente` - Pendiente
+         *     * `aceptada` - Aceptada
+         *     * `rechazada` - Rechazada
+         *     * `cancelada` - Cancelada
+         * @enum {string}
+         */
+        EstadoInvitacionEnum: "pendiente" | "aceptada" | "rechazada" | "cancelada";
+        /** @description Un evento del historial. Todo es de solo lectura. */
+        EventoAuditoria: {
+            readonly id: number;
+            /** Format: date-time */
+            readonly ocurrido_en: string;
+            readonly categoria: components["schemas"]["CategoriaEnum"];
+            readonly categoria_nombre: string;
+            readonly accion: string;
+            readonly usuario_id: number | null;
+            readonly usuario_nombre: string;
+            readonly ip: string | null;
+            readonly entidad_id: number | null;
+            readonly entidad_nombre: string;
+            readonly portafolio_id: number | null;
+            readonly portafolio_nombre: string;
+            readonly objeto_tipo: string;
+            readonly objeto_id: string;
+            readonly objeto_nombre: string;
+            readonly cambios: unknown;
+            readonly detalle: unknown;
+        };
+        /** @description Una invitación, con lo necesario para mostrarla a quien la envía y a quien la recibe. */
+        Invitacion: {
+            readonly id: number;
+            readonly entidad: number;
+            readonly entidad_nombre: string;
+            readonly tipo_nombre: string;
+            readonly usuario: number;
+            readonly username: string;
+            readonly first_name: string;
+            readonly last_name: string;
+            readonly rol: number;
+            readonly rol_nombre: string;
+            readonly invitado_por: number | null;
+            readonly invitado_por_nombre: string;
+            /** @default pendiente */
+            readonly estado: components["schemas"]["EstadoInvitacionEnum"];
+            /** Format: date-time */
+            readonly creado_en: string;
+            /** Format: date-time */
+            readonly respondido_en: string | null;
+        };
+        /** @description Invita a una cuenta que ya existe a unirse a la entidad con un rol. */
+        InvitacionCrearRequest: {
+            /** @description Nombre de usuario de la cuenta a invitar. */
+            username: string;
+            rol: number;
+        };
+        /** @description Una invitación a un portafolio, para quien la envía y para quien la recibe. */
+        InvitacionPortafolio: {
+            readonly id: number;
+            readonly portafolio: number;
+            readonly portafolio_nombre: string;
+            readonly usuario: number;
+            readonly username: string;
+            readonly first_name: string;
+            readonly last_name: string;
+            readonly rol: number;
+            readonly rol_nombre: string;
+            readonly invitado_por: number | null;
+            readonly invitado_por_nombre: string;
+            /** @default pendiente */
+            readonly estado: components["schemas"]["EstadoInvitacionEnum"];
+            /** Format: date-time */
+            readonly creado_en: string;
+            /** Format: date-time */
+            readonly respondido_en: string | null;
+        };
+        /** @description Invita a una cuenta que ya existe a unirse al portafolio con un rol. */
+        InvitacionPortafolioCrearRequest: {
+            /** @description Nombre de usuario de la cuenta a invitar. */
+            username: string;
+            rol: number;
+        };
         /** @description Invalida (lista negra) el refresh token recibido. */
         LogoutRequest: {
             refresh: string;
+        };
+        /**
+         * @description Perfil propio, con lo que la web necesita para decidir qué menús mostrar.
+         *
+         *     Es solo informativo: el backend sigue aplicando todos los permisos en cada endpoint.
+         *     Los permisos de cada entidad (y el rol en ella) llegan en `/api/entities/`.
+         */
+        Me: {
+            readonly id: number;
+            /**
+             * Nombre de usuario
+             * @description Requerido. 150 carácteres como máximo. Únicamente letras, dígitos y @/./+/-/_
+             */
+            readonly username: string;
+            /** Correo electrónico */
+            email?: (string) | null;
+            /** Nombre */
+            first_name?: string;
+            /** Apellidos */
+            last_name?: string;
+            /**
+             * Fecha de alta
+             * Format: date-time
+             */
+            readonly date_joined: string;
+            readonly is_admin: boolean;
+            readonly is_moderator: boolean;
+            readonly is_superuser: boolean;
+            readonly global_permissions: string[];
+        };
+        /**
+         * @description Perfil propio, con lo que la web necesita para decidir qué menús mostrar.
+         *
+         *     Es solo informativo: el backend sigue aplicando todos los permisos en cada endpoint.
+         *     Los permisos de cada entidad (y el rol en ella) llegan en `/api/entities/`.
+         */
+        MeRequest: {
+            /** Correo electrónico */
+            email?: (string) | null;
+            /** Nombre */
+            first_name?: string;
+            /** Apellidos */
+            last_name?: string;
         };
         /** @description Una membresía, con los datos básicos de la persona y su rol. */
         Miembro: {
@@ -523,11 +1142,19 @@ export interface components {
             /** Format: date-time */
             readonly creado_en: string;
         };
-        /** @description Una membresía, con los datos básicos de la persona y su rol. */
-        MiembroRequest: {
-            usuario: number;
+        /**
+         * @description Crea la cuenta de una persona nueva y la suma a la entidad con un rol.
+         *
+         *     Para una cuenta que ya existe se usa una invitación (`InvitacionCrearSerializer`, D-27).
+         */
+        MiembroCrearRequest: {
+            /** @description Datos para crear la cuenta. */
+            new_user: components["schemas"]["RegisterRequest"];
             rol: number;
-            activa?: boolean;
+        };
+        /** @description Cambia una entidad de portafolio (D-29). */
+        MoverEntidadRequest: {
+            portafolio: number;
         };
         PaginatedEntidadList: {
             /** @example 123 */
@@ -543,6 +1170,21 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["Entidad"][];
+        };
+        PaginatedEventoAuditoriaList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["EventoAuditoria"][];
         };
         PaginatedUserAdminList: {
             /** @example 123 */
@@ -562,20 +1204,47 @@ export interface components {
         /** @description Una entidad. El tipo se elige al crear y no cambia después (D-19). */
         PatchedEntidadRequest: {
             tipo?: number;
+            portafolio?: number;
             nombre?: string;
             /** Descripción */
             descripcion?: string;
-            estado?: components["schemas"]["EstadoEnum"];
+            estado?: components["schemas"]["EntidadEstadoEnum"];
+        };
+        /**
+         * @description Perfil propio, con lo que la web necesita para decidir qué menús mostrar.
+         *
+         *     Es solo informativo: el backend sigue aplicando todos los permisos en cada endpoint.
+         *     Los permisos de cada entidad (y el rol en ella) llegan en `/api/entities/`.
+         */
+        PatchedMeRequest: {
+            /** Correo electrónico */
+            email?: (string) | null;
+            /** Nombre */
+            first_name?: string;
+            /** Apellidos */
+            last_name?: string;
         };
         /** @description Cambia el rol de un miembro o lo activa o desactiva. */
         PatchedMiembroEditarRequest: {
             rol?: number;
             activa?: boolean;
         };
+        /** @description Cambia el rol de un miembro del portafolio o lo activa o desactiva. */
+        PatchedPortafolioMiembroEditarRequest: {
+            rol?: number;
+            activa?: boolean;
+        };
+        /** @description Un portafolio, con lo que la persona que consulta puede hacer en él. */
+        PatchedPortafolioRequest: {
+            nombre?: string;
+            /** Descripción */
+            descripcion?: string;
+        };
         /** @description Roles (`Group`) y sus permisos. Solo `Admin` es global; los demás son por entidad (D-16). */
         PatchedRoleRequest: {
             /** Nombre */
             name?: string;
+            ambito?: components["schemas"]["AmbitoEnum"];
             nivel?: number | null;
             nivel_minimo_para_asignar?: number | null;
             permissions?: string[];
@@ -586,8 +1255,6 @@ export interface components {
             nombre_plural?: string;
             /** Admite tareas y Gantt */
             admite_tareas?: boolean;
-            /** Sirve de filtro de contexto en el móvil */
-            es_filtro_contexto?: boolean;
             activo?: boolean;
         };
         /**
@@ -595,6 +1262,7 @@ export interface components {
          *
          *     - `username` solo se define al crear; la contraseña solo se define al crear.
          *     - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+         *     - `is_moderator` (rol global Moderador, D-28) lo cambia quien gestiona usuarios (Admin o superusuario).
          *     - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
          */
         PatchedUserAdminRequest: {
@@ -615,22 +1283,55 @@ export interface components {
              */
             is_active?: boolean;
             is_admin?: boolean;
+            is_moderator?: boolean;
             password?: string;
-        };
-        /** @description Perfil del usuario autenticado. El username no se puede cambiar. */
-        PatchedUserRequest: {
-            /** Correo electrónico */
-            email?: (string) | null;
-            /** Nombre */
-            first_name?: string;
-            /** Apellidos */
-            last_name?: string;
         };
         /** @description Un permiso del catálogo (solo lectura). */
         PermisoCatalogo: {
             codename: string;
             nombre: string;
             ambito: string;
+        };
+        /** @description Un portafolio, con lo que la persona que consulta puede hacer en él. */
+        Portafolio: {
+            readonly id: number;
+            nombre: string;
+            /** Descripción */
+            descripcion?: string;
+            readonly personal: boolean;
+            readonly total_entidades: number;
+            readonly mi_rol: string | null;
+            readonly puede_editar: boolean;
+            readonly puede_eliminar: boolean;
+            readonly puede_crear_entidades: boolean;
+            readonly puede_ver_miembros: boolean;
+            readonly puede_gestionar_miembros: boolean;
+            readonly puede_ver_historial: boolean;
+            readonly creado_por: number | null;
+            /** Format: date-time */
+            readonly creado_en: string;
+        };
+        /** @description Una membresía de portafolio, con los datos básicos de la persona y su rol. */
+        PortafolioMiembro: {
+            readonly id: number;
+            readonly usuario: number;
+            readonly username: string;
+            readonly first_name: string;
+            readonly last_name: string;
+            /** Format: email */
+            readonly email: string;
+            readonly rol: number;
+            readonly rol_nombre: string;
+            readonly nivel: number | null;
+            readonly activa: boolean;
+            /** Format: date-time */
+            readonly creado_en: string;
+        };
+        /** @description Un portafolio, con lo que la persona que consulta puede hacer en él. */
+        PortafolioRequest: {
+            nombre: string;
+            /** Descripción */
+            descripcion?: string;
         };
         Register: {
             readonly id: number;
@@ -660,6 +1361,12 @@ export interface components {
             /** Apellidos */
             last_name?: string;
         };
+        /** @description Un rol que quien consulta puede asignar en la entidad (para los formularios de miembros). */
+        RolAsignable: {
+            id: number;
+            name: string;
+            nivel: number;
+        };
         /** @description Roles (`Group`) y sus permisos. Solo `Admin` es global; los demás son por entidad (D-16). */
         Role: {
             readonly id: number;
@@ -675,6 +1382,7 @@ export interface components {
         RoleRequest: {
             /** Nombre */
             name: string;
+            ambito?: components["schemas"]["AmbitoEnum"];
             nivel?: number | null;
             nivel_minimo_para_asignar?: number | null;
             permissions?: string[];
@@ -686,8 +1394,6 @@ export interface components {
             nombre_plural: string;
             /** Admite tareas y Gantt */
             admite_tareas?: boolean;
-            /** Sirve de filtro de contexto en el móvil */
-            es_filtro_contexto?: boolean;
             activo?: boolean;
             readonly total_entidades: number;
         };
@@ -697,8 +1403,6 @@ export interface components {
             nombre_plural: string;
             /** Admite tareas y Gantt */
             admite_tareas?: boolean;
-            /** Sirve de filtro de contexto en el móvil */
-            es_filtro_contexto?: boolean;
             activo?: boolean;
         };
         TokenObtainPair: {
@@ -715,31 +1419,12 @@ export interface components {
         TokenRefreshRequest: {
             refresh: string;
         };
-        /** @description Perfil del usuario autenticado. El username no se puede cambiar. */
-        User: {
-            readonly id: number;
-            /**
-             * Nombre de usuario
-             * @description Requerido. 150 carácteres como máximo. Únicamente letras, dígitos y @/./+/-/_
-             */
-            readonly username: string;
-            /** Correo electrónico */
-            email?: (string) | null;
-            /** Nombre */
-            first_name?: string;
-            /** Apellidos */
-            last_name?: string;
-            /**
-             * Fecha de alta
-             * Format: date-time
-             */
-            readonly date_joined: string;
-        };
         /**
          * @description Gestión de usuarios por el rol Admin (HU-24).
          *
          *     - `username` solo se define al crear; la contraseña solo se define al crear.
          *     - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+         *     - `is_moderator` (rol global Moderador, D-28) lo cambia quien gestiona usuarios (Admin o superusuario).
          *     - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
          */
         UserAdmin: {
@@ -761,6 +1446,7 @@ export interface components {
              */
             is_active?: boolean;
             is_admin?: boolean;
+            is_moderator?: boolean;
             /** Intentos fallidos */
             readonly failed_attempts: number;
             /**
@@ -780,6 +1466,7 @@ export interface components {
          *
          *     - `username` solo se define al crear; la contraseña solo se define al crear.
          *     - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+         *     - `is_moderator` (rol global Moderador, D-28) lo cambia quien gestiona usuarios (Admin o superusuario).
          *     - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
          */
         UserAdminRequest: {
@@ -800,16 +1487,8 @@ export interface components {
              */
             is_active?: boolean;
             is_admin?: boolean;
+            is_moderator?: boolean;
             password?: string;
-        };
-        /** @description Perfil del usuario autenticado. El username no se puede cambiar. */
-        UserRequest: {
-            /** Correo electrónico */
-            email?: (string) | null;
-            /** Nombre */
-            first_name?: string;
-            /** Apellidos */
-            last_name?: string;
         };
     };
     responses: never;
@@ -820,6 +1499,64 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    audit_list: {
+        parameters: {
+            query?: {
+                accion?: string;
+                /**
+                 * @description * `sistema` - Sistema
+                 *     * `entidad` - Entidad
+                 *     * `contenido` - Contenido
+                 */
+                categoria?: "contenido" | "entidad" | "sistema";
+                desde?: string;
+                entidad?: number;
+                hasta?: string;
+                objeto_id?: string;
+                objeto_tipo?: string;
+                /** @description Un número de página dentro del conjunto de resultados paginado. */
+                page?: number;
+                portafolio?: number;
+                usuario?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEventoAuditoriaList"];
+                };
+            };
+        };
+    };
+    audit_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este evento de auditoría. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventoAuditoria"];
+                };
+            };
+        };
+    };
     auth_logout_create: {
         parameters: {
             query?: never;
@@ -858,7 +1595,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["User"];
+                    "application/json": components["schemas"]["Me"];
                 };
             };
         };
@@ -872,9 +1609,9 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["UserRequest"];
-                "application/x-www-form-urlencoded": components["schemas"]["UserRequest"];
-                "multipart/form-data": components["schemas"]["UserRequest"];
+                "application/json": components["schemas"]["MeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["MeRequest"];
+                "multipart/form-data": components["schemas"]["MeRequest"];
             };
         };
         responses: {
@@ -883,7 +1620,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["User"];
+                    "application/json": components["schemas"]["Me"];
                 };
             };
         };
@@ -897,9 +1634,9 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["PatchedUserRequest"];
-                "application/x-www-form-urlencoded": components["schemas"]["PatchedUserRequest"];
-                "multipart/form-data": components["schemas"]["PatchedUserRequest"];
+                "application/json": components["schemas"]["PatchedMeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedMeRequest"];
+                "multipart/form-data": components["schemas"]["PatchedMeRequest"];
             };
         };
         responses: {
@@ -908,7 +1645,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["User"];
+                    "application/json": components["schemas"]["Me"];
                 };
             };
         };
@@ -1036,6 +1773,7 @@ export interface operations {
                 estado?: "activa" | "archivada";
                 /** @description Un número de página dentro del conjunto de resultados paginado. */
                 page?: number;
+                portafolio?: number;
                 tipo?: number;
             };
             header?: never;
@@ -1077,9 +1815,127 @@ export interface operations {
             };
         };
     };
-    entities_members_list: {
+    entities_assignable_roles_list: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                entidad_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RolAsignable"][];
+                };
+            };
+        };
+    };
+    entities_candidates_list: {
+        parameters: {
+            query?: {
+                /** @description Texto a buscar (usuario o nombre) */
+                q?: string;
+            };
+            header?: never;
+            path: {
+                entidad_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Candidato"][];
+                };
+            };
+        };
+    };
+    entities_invitations_list: {
+        parameters: {
+            query?: {
+                /** @description pendiente (defecto), aceptada, rechazada, cancelada o todas */
+                estado?: string;
+            };
+            header?: never;
+            path: {
+                entidad_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invitacion"][];
+                };
+            };
+        };
+    };
+    entities_invitations_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entidad_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitacionCrearRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invitacion"];
+                };
+            };
+        };
+    };
+    entities_invitations_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entidad_id: number;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    entities_members_list: {
+        parameters: {
+            query?: {
+                /** @description true (defecto), false o todas */
+                activa?: string;
+            };
             header?: never;
             path: {
                 entidad_id: number;
@@ -1109,7 +1965,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MiembroRequest"];
+                "application/json": components["schemas"]["MiembroCrearRequest"];
             };
         };
         responses: {
@@ -1240,6 +2096,32 @@ export interface operations {
             };
         };
     };
+    entities_move_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este entidad. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoverEntidadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entidad"];
+                };
+            };
+        };
+    };
     entity_types_list: {
         parameters: {
             query?: never;
@@ -1351,6 +2233,67 @@ export interface operations {
             };
         };
     };
+    invitations_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invitacion"][];
+                };
+            };
+        };
+    };
+    invitations_accept_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invitacion"];
+                };
+            };
+        };
+    };
+    invitations_reject_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invitacion"];
+                };
+            };
+        };
+    };
     permissions_list: {
         parameters: {
             query?: never;
@@ -1366,6 +2309,362 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PermisoCatalogo"][];
+                };
+            };
+        };
+    };
+    portfolio_invitations_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitacionPortafolio"][];
+                };
+            };
+        };
+    };
+    portfolio_invitations_accept_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitacionPortafolio"];
+                };
+            };
+        };
+    };
+    portfolio_invitations_reject_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitacionPortafolio"];
+                };
+            };
+        };
+    };
+    portfolios_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Portafolio"][];
+                };
+            };
+        };
+    };
+    portfolios_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortafolioRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Portafolio"];
+                };
+            };
+        };
+    };
+    portfolios_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este portafolio. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Portafolio"];
+                };
+            };
+        };
+    };
+    portfolios_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este portafolio. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    portfolios_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un valor de entero único que identifique este portafolio. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedPortafolioRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Portafolio"];
+                };
+            };
+        };
+    };
+    portfolios_assignable_roles_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portafolio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RolAsignable"][];
+                };
+            };
+        };
+    };
+    portfolios_invitations_list: {
+        parameters: {
+            query?: {
+                /** @description pendiente (defecto), aceptada, rechazada, cancelada o todas */
+                estado?: string;
+            };
+            header?: never;
+            path: {
+                portafolio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitacionPortafolio"][];
+                };
+            };
+        };
+    };
+    portfolios_invitations_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portafolio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitacionPortafolioCrearRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitacionPortafolio"];
+                };
+            };
+        };
+    };
+    portfolios_invitations_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                portafolio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    portfolios_members_list: {
+        parameters: {
+            query?: {
+                /** @description true (defecto), false o todas */
+                activa?: string;
+            };
+            header?: never;
+            path: {
+                portafolio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortafolioMiembro"][];
+                };
+            };
+        };
+    };
+    portfolios_members_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                portafolio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortafolioMiembro"];
+                };
+            };
+        };
+    };
+    portfolios_members_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                portafolio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    portfolios_members_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                portafolio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedPortafolioMiembroEditarRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortafolioMiembro"];
                 };
             };
         };

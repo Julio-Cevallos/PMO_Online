@@ -93,13 +93,18 @@ class CatalogoYListadoTests(RolesBaseTestCase):
             [
                 "accounts.manage_roles",
                 "accounts.manage_users",
+                "audit.view_system_log",
+                "entities.create_entity",
                 "entities.manage_entities",
                 "entities.manage_types",
             ],
         )
+        self.assertEqual(filas["Moderador"]["scope"], "global")
+        self.assertTrue(filas["Moderador"]["is_system"])
+        self.assertEqual(filas["Moderador"]["permissions"], ["entities.create_entity"])
         self.assertEqual(filas["Planificador"]["scope"], "entidad")
         self.assertEqual(filas["Planificador"]["permissions"], ["entities.view_members"])
-        self.assertEqual(filas["Auditor"]["permissions"], [])
+        self.assertEqual(filas["Auditor"]["permissions"], ["audit.view_entity_log"])
 
     def test_listado_hace_pocas_consultas_aunque_haya_muchos_roles(self) -> None:
         def consultas() -> int:
@@ -243,7 +248,7 @@ class EditarRolTests(RolesBaseTestCase):
             self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
             r = self.client.patch(self.detalle(ROL_ADMIN), {"name": "Otro"})
             self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(Group.objects.get(name=ROL_ADMIN).permissions.count(), 4)
+        self.assertEqual(Group.objects.get(name=ROL_ADMIN).permissions.count(), 6)
 
     def test_no_hay_put(self) -> None:
         r = self.client.put(self.detalle("Auditor"), {"name": "Auditor"})

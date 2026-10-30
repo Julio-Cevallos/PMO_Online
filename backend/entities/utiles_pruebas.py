@@ -3,15 +3,15 @@
 from django.contrib.auth.models import Group, Permission
 
 from accounts.models import User
-from accounts.roles import ROL_ADMIN
+from accounts.roles import ROL_ADMIN, ROL_MODERADOR
 
-from .models import Entidad, Membresia, TipoEntidad
+from .models import Entidad, Membresia, Portafolio, TipoEntidad
 
 PASSWORD = "Clave-Segura-2026"
 
 RESPONSABLE = "Responsable de entidad"
 PLANIFICADOR = "Planificador"
-OPERARIO = "Operario de campo"
+COLABORADOR = "Colaborador"
 AUDITOR = "Auditor"
 
 
@@ -24,8 +24,26 @@ def usuario(nombre: str, *, admin: bool = False, superuser: bool = False) -> Use
     return User.objects.get(pk=user.pk)  # sin la caché de permisos de la instancia
 
 
-def entidad(nombre: str = "Alfa", tipo: str = "Proyecto") -> Entidad:
-    return Entidad.objects.create(tipo=TipoEntidad.objects.get(nombre=tipo), nombre=nombre)
+def moderador(nombre: str) -> User:
+    """Cuenta con el rol global Moderador."""
+    user = User.objects.create_user(nombre, f"{nombre}@example.com", PASSWORD)
+    user.groups.add(Group.objects.get(name=ROL_MODERADOR))
+    return User.objects.get(pk=user.pk)  # sin la caché de permisos de la instancia
+
+
+def portafolio(nombre: str = "General") -> Portafolio:
+    """Un portafolio compartido (sin miembros), por defecto el de las entidades de las pruebas."""
+    return Portafolio.objects.get_or_create(nombre=nombre, personal=False)[0]
+
+
+def entidad(
+    nombre: str = "Alfa", tipo: str = "Proyecto", portafolio_: Portafolio | None = None
+) -> Entidad:
+    return Entidad.objects.create(
+        tipo=TipoEntidad.objects.get(nombre=tipo),
+        nombre=nombre,
+        portafolio=portafolio_ or portafolio(),
+    )
 
 
 def miembro(user: User, ent: Entidad, rol: str, *, activa: bool = True) -> Membresia:

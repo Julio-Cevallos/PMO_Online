@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import TipoEntidad
-from .utiles_pruebas import OPERARIO, RESPONSABLE, entidad, miembro, usuario
+from .utiles_pruebas import COLABORADOR, RESPONSABLE, entidad, miembro, usuario
 
 
 class TiposBase(APITestCase):
@@ -26,7 +26,8 @@ class TiposSembradosTests(TiposBase):
         filas = {t["nombre"]: t for t in self.client.get(self.url).data}
         self.assertEqual(filas["Sucursal"]["nombre_plural"], "Sucursales")
         self.assertTrue(filas["Proyecto"]["admite_tareas"])
-        self.assertTrue(filas["Proyecto"]["es_filtro_contexto"])
+        # No hay un interruptor de "filtro" por tipo: en el móvil se puede filtrar por cualquiera.
+        self.assertNotIn("es_filtro_contexto", filas["Proyecto"])
         self.assertTrue(filas["Proyecto"]["activo"])
 
 
@@ -41,13 +42,13 @@ class AccesoTiposTests(TiposBase):
 
     def test_un_miembro_puede_ver_los_tipos(self) -> None:
         ana = usuario("ana")
-        miembro(ana, entidad(), OPERARIO)
+        miembro(ana, entidad(), COLABORADOR)
         self.client.force_authenticate(ana)
         self.assertEqual(self.client.get(self.url).status_code, status.HTTP_200_OK)
 
     def test_un_miembro_inactivo_ya_no_los_ve(self) -> None:
         ana = usuario("ana")
-        miembro(ana, entidad(), OPERARIO, activa=False)
+        miembro(ana, entidad(), COLABORADOR, activa=False)
         self.client.force_authenticate(ana)
         self.assertEqual(self.client.get(self.url).status_code, status.HTTP_403_FORBIDDEN)
 
@@ -88,11 +89,11 @@ class GestionTiposTests(TiposBase):
 
     def test_editar_un_tipo(self) -> None:
         r = self.client.patch(
-            self.detalle("Sucursal"), {"es_filtro_contexto": False, "nombre_plural": "Locales"}
+            self.detalle("Sucursal"), {"admite_tareas": False, "nombre_plural": "Locales"}
         )
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         tipo = TipoEntidad.objects.get(nombre="Sucursal")
-        self.assertEqual((tipo.es_filtro_contexto, tipo.nombre_plural), (False, "Locales"))
+        self.assertEqual((tipo.admite_tareas, tipo.nombre_plural), (False, "Locales"))
 
     def test_renombrar_con_el_mismo_nombre_es_valido(self) -> None:
         r = self.client.patch(self.detalle("Sucursal"), {"nombre": "Sucursal"})

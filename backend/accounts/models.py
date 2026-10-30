@@ -6,7 +6,7 @@ from django.contrib.auth.models import UserManager as DjangoUserManager
 from django.db import models
 from django.utils import timezone
 
-from .roles import PERMISOS_GLOBALES, ROL_ADMIN
+from .roles import PERMISOS_GLOBALES, ROL_ADMIN, ROL_MODERADOR
 
 
 class UserManager(DjangoUserManager):
@@ -47,6 +47,11 @@ class User(AbstractUser):
         return any(grupo.name == ROL_ADMIN for grupo in self.groups.all())
 
     @property
+    def is_moderator(self) -> bool:
+        """Tiene el rol global Moderador (crea entidades y es dueño de las suyas)."""
+        return any(grupo.name == ROL_MODERADOR for grupo in self.groups.all())
+
+    @property
     def is_locked(self) -> bool:
         return self.locked_until is not None and self.locked_until > timezone.now()
 
@@ -79,10 +84,20 @@ class PerfilRol(models.Model):
       rol. Además debe tener un nivel estrictamente mayor al del rol. Por defecto es nivel + 1;
       el Auditor lo sube a 40 para que solo el Responsable pueda nombrarlo.
 
+    En los roles de portafolio (`ambito=portafolio`) `nivel_minimo_para_asignar` no se usa: quien
+    tenga el permiso de gestionar miembros del portafolio puede asignar roles de su mismo nivel o
+    menor (así varios Gestores pueden colaborar).
+
     El rol `Admin` es global y no tiene perfil: queda por encima de todos los niveles.
     """
 
+    class Ambito(models.TextChoices):
+        ENTIDAD = "entidad", "Entidad"
+        PORTAFOLIO = "portafolio", "Portafolio"
+
     grupo = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="perfil")
+    # Dónde se asigna el rol: en una entidad (membresía) o en un portafolio (D-29).
+    ambito = models.CharField(max_length=10, choices=Ambito.choices, default=Ambito.ENTIDAD)
     nivel = models.PositiveSmallIntegerField("nivel")
     nivel_minimo_para_asignar = models.PositiveSmallIntegerField("nivel mínimo para asignar")
 

@@ -1,3 +1,4 @@
+from django.db import transaction
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
@@ -8,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from . import auditoria
 from .models import User
 from .permissions import requiere_permiso
 from .serializers import (
@@ -16,8 +18,8 @@ from .serializers import (
     LogoutSerializer,
     RegisterSerializer,
     UserAdminSerializer,
-    UserSerializer,
 )
+from .serializers_me import MeSerializer
 
 
 class LoginView(TokenObtainPairView):
@@ -46,14 +48,25 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = (permissions.AllowAny,)
 
+    @transaction.atomic
+    def perform_create(self, serializer: RegisterSerializer) -> None:
+        user = serializer.save()
+        auditoria.usuario_registrado(self.request, user)
+
 
 class MeView(generics.RetrieveUpdateAPIView):
-    """Perfil del usuario autenticado (GET, PUT, PATCH)."""
+    """Perfil del usuario autenticado (GET, PUT, PATCH), con su rol global y permisos."""
 
-    serializer_class = UserSerializer
+    serializer_class = MeSerializer
 
     def get_object(self) -> User:
         return self.request.user
+
+    @transaction.atomic
+    def perform_update(self, serializer: MeSerializer) -> None:
+        antes = auditoria.foto_usuario(self.request.user)
+        usuario = serializer.save()
+        auditoria.perfil_editado(self.request, usuario, antes)
 
 
 class LogoutView(APIView):
@@ -81,7 +94,9 @@ class ChangePasswordView(APIView):
     def post(self, request: Request) -> Response:
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        with transaction.atomic():
+            serializer.save()
+            auditoria.clave_cambiada(request, request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -116,5 +131,8 @@ class UserAdminViewSet(
     @action(detail=True, methods=["post"])
     def unlock(self, request: Request, pk: str | None = None) -> Response:
         """Quita el bloqueo por intentos fallidos y reinicia el contador."""
-        self.get_object().unlock()
+        usuario = self.get_object()
+        with transaction.atomic():
+            usuario.unlock()
+            auditoria.cuenta_desbloqueada(request, usuario)
         return Response(status=status.HTTP_204_NO_CONTENT)

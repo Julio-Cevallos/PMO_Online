@@ -1,4 +1,5 @@
 from django.contrib.auth.models import Group
+from django.db import transaction
 from django.db.models import ProtectedError
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
@@ -8,21 +9,23 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from . import auditoria
 from .catalogo import permisos_registrados
 from .errores import Conflicto
 from .permissions import requiere_permiso
-from .roles import ROL_ADMIN, ROLES_POR_ENTIDAD
+from .roles import ROLES_CON_PERFIL, ROLES_GLOBALES
 from .serializers_roles import PermisoCatalogoSerializer, RoleSerializer
 
 
 class RolViewSet(viewsets.ModelViewSet):
     """Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
 
-    - `Admin` es del sistema y global: no se edita ni se borra.
-    - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+    - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+    - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+      `Coordinador`) son del sistema: se editan sus permisos,
       pero no se renombran ni se borran.
-    - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-      catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+    - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+      reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
     """
 
     serializer_class = RoleSerializer
@@ -39,18 +42,26 @@ class RolViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request: Request, *args, **kwargs) -> Response:
-        if self.get_object().name == ROL_ADMIN:
-            raise PermissionDenied("El rol Admin es del sistema y no se modifica.")
+        nombre = self.get_object().name
+        if nombre in ROLES_GLOBALES:
+            raise PermissionDenied(f"El rol {nombre} es del sistema y no se modifica.")
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request: Request, *args, **kwargs) -> Response:
         nombre = self.get_object().name
-        if nombre == ROL_ADMIN or nombre in ROLES_POR_ENTIDAD:
+        if nombre in ROLES_GLOBALES or nombre in ROLES_CON_PERFIL:
             raise PermissionDenied("Los roles del sistema no se pueden eliminar.")
         try:
             return super().destroy(request, *args, **kwargs)
         except ProtectedError as exc:  # el rol está en uso por membresías (módulo `entities`)
             raise Conflicto("El rol está en uso por miembros de alguna entidad.") from exc
+
+    @transaction.atomic
+    def perform_destroy(self, instance: Group) -> None:
+        # Se registra antes de borrar (después el rol pierde su id). Si el borrado falla (rol en
+        # uso), la transacción se revierte y tampoco queda el evento.
+        auditoria.rol_eliminado(self.request, instance)
+        instance.delete()
 
 
 class PermisoCatalogoView(APIView):

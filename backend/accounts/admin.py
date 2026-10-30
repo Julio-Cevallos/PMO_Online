@@ -3,6 +3,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
+from . import auditoria
 from .models import User
 
 
@@ -23,4 +24,5 @@ class AccountsUserAdmin(UserAdmin):
     def desbloquear(self, request: HttpRequest, queryset: QuerySet[User]) -> None:
         for user in queryset:
             user.unlock()
+            auditoria.cuenta_desbloqueada(request, user)
         self.message_user(request, f"{queryset.count()} cuenta(s) desbloqueada(s).")

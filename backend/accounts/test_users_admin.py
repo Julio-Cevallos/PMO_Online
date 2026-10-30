@@ -37,10 +37,15 @@ class RolesDelSistemaTests(APITestCase):
 
     def test_permisos_iniciales_de_los_roles_por_entidad(self) -> None:
         esperados = {
-            "Responsable de entidad": {"edit_entity", "view_members", "manage_members"},
+            "Responsable de entidad": {
+                "edit_entity",
+                "view_members",
+                "manage_members",
+                "view_entity_log",
+            },
             "Planificador": {"view_members"},
-            "Operario de campo": set(),
-            "Auditor": set(),
+            "Colaborador": set(),
+            "Auditor": {"view_entity_log"},
         }
         self.assertEqual(set(esperados), set(ROLES_POR_ENTIDAD))
         for nombre, codenames in esperados.items():
@@ -149,6 +154,16 @@ class GestionUsuariosTests(APITestCase):
         r = self.client.post(self.url, {**self.nuevo, "password": "12345678"})
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(User.objects.filter(username="ana").exists())
+
+    def test_crear_clave_longitud_maxima(self) -> None:
+        clave = "Zk9#" * 32
+        r = self.client.post(self.url, {**self.nuevo, "password": clave + "a"})
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", r.data)
+        self.assertFalse(User.objects.filter(username="ana").exists())
+
+        r = self.client.post(self.url, {**self.nuevo, "password": clave})
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
 
     def test_crear_con_correo_repetido(self) -> None:
         crear_usuario("otro")

@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 from .models import Entidad, TipoEntidad
 from .utiles_pruebas import (
     AUDITOR,
-    OPERARIO,
+    COLABORADOR,
     PLANIFICADOR,
     RESPONSABLE,
     entidad,
@@ -90,7 +90,7 @@ class CrearEntidadTests(EntidadesBase):
 class VisibilidadTests(EntidadesBase):
     def test_cada_persona_ve_solo_sus_entidades(self) -> None:
         ana = usuario("ana")
-        miembro(ana, self.alfa, OPERARIO)
+        miembro(ana, self.alfa, COLABORADOR)
         self.como(ana)
         nombres = {e["nombre"] for e in self.client.get(self.url).data["results"]}
         self.assertEqual(nombres, {"Alfa"})
@@ -117,7 +117,7 @@ class VisibilidadTests(EntidadesBase):
 
     def test_una_membresia_inactiva_quita_la_visibilidad(self) -> None:
         ana = usuario("ana")
-        miembro(ana, self.alfa, OPERARIO, activa=False)
+        miembro(ana, self.alfa, COLABORADOR, activa=False)
         self.como(ana)
         self.assertEqual(self.client.get(self.url).data["results"], [])
         self.assertEqual(self.client.get(self.detalle(self.alfa)).status_code, 404)
@@ -137,8 +137,8 @@ class VisibilidadTests(EntidadesBase):
 
     def test_una_persona_con_dos_entidades_no_duplica_resultados(self) -> None:
         ana = usuario("ana")
-        miembro(ana, self.alfa, OPERARIO)
-        miembro(ana, self.norte, OPERARIO)
+        miembro(ana, self.alfa, COLABORADOR)
+        miembro(ana, self.norte, COLABORADOR)
         self.como(ana)
         self.assertEqual(len(self.client.get(self.url).data["results"]), 2)
 
@@ -161,7 +161,7 @@ class EditarEntidadTests(EntidadesBase):
         self.assertEqual((self.alfa.nombre, self.alfa.descripcion), ("Alfa 2", "Nueva"))
 
     def test_sin_el_permiso_de_editar_da_403(self) -> None:
-        for rol in (PLANIFICADOR, OPERARIO, AUDITOR):
+        for rol in (PLANIFICADOR, COLABORADOR, AUDITOR):
             user = usuario(f"u_{rol[:3].lower()}")
             miembro(user, self.alfa, rol)
             self.como(user)

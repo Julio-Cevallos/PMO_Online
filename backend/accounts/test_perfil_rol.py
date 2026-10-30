@@ -30,7 +30,7 @@ class PerfilesDelSistemaTests(TestCase):
                 "Responsable de entidad": 40,
                 "Planificador": 30,
                 "Auditor": 20,
-                "Operario de campo": 10,
+                "Colaborador": 10,
             },
         )
 
@@ -94,24 +94,24 @@ class PuedeAsignarTests(TestCase):
     def test_responsable(self) -> None:
         self.assertTrue(self.permitido("Responsable de entidad", "Planificador"))
         self.assertTrue(self.permitido("Responsable de entidad", "Auditor"))
-        self.assertTrue(self.permitido("Responsable de entidad", "Operario de campo"))
+        self.assertTrue(self.permitido("Responsable de entidad", "Colaborador"))
 
     def test_nadie_asigna_su_mismo_nivel_ni_uno_mayor(self) -> None:
         for nombre in ROLES_POR_ENTIDAD:
             self.assertFalse(self.permitido(nombre, nombre))
         self.assertFalse(self.permitido("Planificador", "Responsable de entidad"))
-        self.assertFalse(self.permitido("Operario de campo", "Planificador"))
+        self.assertFalse(self.permitido("Colaborador", "Planificador"))
 
     def test_el_responsable_no_asigna_otro_responsable(self) -> None:
         self.assertFalse(self.permitido("Responsable de entidad", "Responsable de entidad"))
 
     def test_el_planificador_asigna_operarios_pero_no_auditores(self) -> None:
-        self.assertTrue(self.permitido("Planificador", "Operario de campo"))
+        self.assertTrue(self.permitido("Planificador", "Colaborador"))
         self.assertFalse(self.permitido("Planificador", "Auditor"))
 
     def test_el_operario_no_asigna_a_nadie(self) -> None:
         for nombre in ROLES_POR_ENTIDAD:
-            self.assertFalse(self.permitido("Operario de campo", nombre))
+            self.assertFalse(self.permitido("Colaborador", nombre))
 
     def test_un_rol_nuevo_sigue_la_regla_por_defecto(self) -> None:
         grupo = Group.objects.create(name="Supervisor")
@@ -181,11 +181,11 @@ class ApiNivelesTests(APITestCase):
             self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_el_admin_ajusta_el_nivel_de_un_rol_del_sistema(self) -> None:
-        r = self.client.patch(self.detalle("Operario de campo"), {"nivel": 12})
+        r = self.client.patch(self.detalle("Colaborador"), {"nivel": 12})
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         # El mínimo era 11 y quedaría por debajo del nivel: se ajusta solo.
         self.assertEqual((r.data["nivel"], r.data["nivel_minimo_para_asignar"]), (12, 13))
-        self.assertEqual(perfil("Operario de campo").nivel, 12)
+        self.assertEqual(perfil("Colaborador").nivel, 12)
 
     def test_cambiar_el_nivel_conserva_un_minimo_que_sigue_siendo_valido(self) -> None:
         r = self.client.patch(self.detalle("Auditor"), {"nivel": 25})
@@ -193,9 +193,9 @@ class ApiNivelesTests(APITestCase):
 
     def test_cambiar_el_nivel_con_un_minimo_invalido_se_rechaza(self) -> None:
         body = {"nivel": 30, "nivel_minimo_para_asignar": 30}
-        r = self.client.patch(self.detalle("Operario de campo"), body)
+        r = self.client.patch(self.detalle("Colaborador"), body)
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(perfil("Operario de campo").nivel, 10)
+        self.assertEqual(perfil("Colaborador").nivel, 10)
 
     def test_cambiar_solo_el_minimo(self) -> None:
         r = self.client.patch(self.detalle("Auditor"), {"nivel_minimo_para_asignar": 90})

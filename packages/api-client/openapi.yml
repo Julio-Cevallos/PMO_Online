@@ -4,6 +4,104 @@ info:
   version: 0.1.0
   description: API de gestión de proyectos
 paths:
+  /api/audit/:
+    get:
+      operationId: audit_list
+      description: |-
+        Historial de auditoría: solo lectura, del más reciente al más antiguo, paginado.
+
+        Cada persona ve solo lo que le corresponde (ver `audit/visibilidad.py`). Un evento fuera de
+        su alcance responde 404.
+      parameters:
+      - in: query
+        name: accion
+        schema:
+          type: string
+      - in: query
+        name: categoria
+        schema:
+          type: string
+          enum:
+          - contenido
+          - entidad
+          - sistema
+        description: |-
+          * `sistema` - Sistema
+          * `entidad` - Entidad
+          * `contenido` - Contenido
+      - in: query
+        name: desde
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: entidad
+        schema:
+          type: integer
+      - in: query
+        name: hasta
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: objeto_id
+        schema:
+          type: string
+      - in: query
+        name: objeto_tipo
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - in: query
+        name: portafolio
+        schema:
+          type: integer
+      - in: query
+        name: usuario
+        schema:
+          type: integer
+      tags:
+      - audit
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEventoAuditoriaList'
+          description: ''
+  /api/audit/{id}/:
+    get:
+      operationId: audit_retrieve
+      description: |-
+        Historial de auditoría: solo lectura, del más reciente al más antiguo, paginado.
+
+        Cada persona ve solo lo que le corresponde (ver `audit/visibilidad.py`). Un evento fuera de
+        su alcance responde 404.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este evento de auditoría.
+        required: true
+      tags:
+      - audit
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventoAuditoria'
+          description: ''
   /api/auth/logout/:
     post:
       operationId: auth_logout_create
@@ -34,7 +132,8 @@ paths:
   /api/auth/me/:
     get:
       operationId: auth_me_retrieve
-      description: Perfil del usuario autenticado (GET, PUT, PATCH).
+      description: Perfil del usuario autenticado (GET, PUT, PATCH), con su rol global
+        y permisos.
       tags:
       - auth
       security:
@@ -44,24 +143,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/Me'
           description: ''
     put:
       operationId: auth_me_update
-      description: Perfil del usuario autenticado (GET, PUT, PATCH).
+      description: Perfil del usuario autenticado (GET, PUT, PATCH), con su rol global
+        y permisos.
       tags:
       - auth
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserRequest'
+              $ref: '#/components/schemas/MeRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/UserRequest'
+              $ref: '#/components/schemas/MeRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UserRequest'
+              $ref: '#/components/schemas/MeRequest'
       security:
       - jwtAuth: []
       responses:
@@ -69,24 +169,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/Me'
           description: ''
     patch:
       operationId: auth_me_partial_update
-      description: Perfil del usuario autenticado (GET, PUT, PATCH).
+      description: Perfil del usuario autenticado (GET, PUT, PATCH), con su rol global
+        y permisos.
       tags:
       - auth
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedUserRequest'
+              $ref: '#/components/schemas/PatchedMeRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedUserRequest'
+              $ref: '#/components/schemas/PatchedMeRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedUserRequest'
+              $ref: '#/components/schemas/PatchedMeRequest'
       security:
       - jwtAuth: []
       responses:
@@ -94,7 +195,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/Me'
           description: ''
   /api/auth/password/change/:
     post:
@@ -210,9 +311,13 @@ paths:
       description: |-
         Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
 
-        - Crear: solo el Admin (`entities.manage_entities`).
-        - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
-        - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+        - Cada entidad pertenece a un portafolio (D-29). Se ven las propias (membresía) y las de los
+          portafolios donde se tiene permiso de verlas; el Admin ve todas.
+        - Crear: Admin, Moderador (en su portafolio personal si no elige otro) o quien tenga
+          `create_portfolio_entities` en el portafolio elegido.
+        - Editar nombre y descripción: quien tenga `edit_portfolio_entities` en el portafolio o
+          `entities.edit_entity` en ella.
+        - Archivar o reactivar (`estado`) y mover (`/move/`): según permisos del portafolio. No hay DELETE.
       parameters:
       - in: query
         name: estado
@@ -228,6 +333,10 @@ paths:
         required: false
         in: query
         description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - in: query
+        name: portafolio
         schema:
           type: integer
       - in: query
@@ -250,9 +359,13 @@ paths:
       description: |-
         Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
 
-        - Crear: solo el Admin (`entities.manage_entities`).
-        - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
-        - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+        - Cada entidad pertenece a un portafolio (D-29). Se ven las propias (membresía) y las de los
+          portafolios donde se tiene permiso de verlas; el Admin ve todas.
+        - Crear: Admin, Moderador (en su portafolio personal si no elige otro) o quien tenga
+          `create_portfolio_entities` en el portafolio elegido.
+        - Editar nombre y descripción: quien tenga `edit_portfolio_entities` en el portafolio o
+          `entities.edit_entity` en ella.
+        - Archivar o reactivar (`estado`) y mover (`/move/`): según permisos del portafolio. No hay DELETE.
       tags:
       - entities
       requestBody:
@@ -270,6 +383,152 @@ paths:
               schema:
                 $ref: '#/components/schemas/Entidad'
           description: ''
+  /api/entities/{entidad_id}/assignable-roles/:
+    get:
+      operationId: entities_assignable_roles_list
+      description: |-
+        Roles que quien consulta puede asignar en la entidad (D-18), del de más nivel al de menos.
+
+        Sirve para llenar el selector de rol al agregar o cambiar miembros: quien no es Admin no
+        puede listar todos los roles (`/api/roles/`).
+      parameters:
+      - in: path
+        name: entidad_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - entities
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RolAsignable'
+          description: ''
+  /api/entities/{entidad_id}/candidates/:
+    get:
+      operationId: entities_candidates_list
+      description: |-
+        Busca cuentas para sumar a la entidad (`?q=` por usuario, nombre o apellido).
+
+        Devuelve como máximo 10, ordenadas por usuario. El Admin busca entre todas las cuentas
+        (menos superusuarios); los demás, solo entre quienes comparten con ellos otra entidad.
+      parameters:
+      - in: path
+        name: entidad_id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Texto a buscar (usuario o nombre)
+      tags:
+      - entities
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Candidato'
+          description: ''
+  /api/entities/{entidad_id}/invitations/:
+    get:
+      operationId: entities_invitations_list
+      description: |-
+        Invitaciones de una entidad.
+
+        - GET: quien puede ver miembros. Por defecto las pendientes (`?estado=` otro estado o `todas`).
+        - POST: invita a una cuenta que ya existe, con un rol de nivel menor al propio (D-18).
+          La persona la acepta o rechaza desde `/api/invitations/`.
+      parameters:
+      - in: path
+        name: entidad_id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: estado
+        schema:
+          type: string
+        description: pendiente (defecto), aceptada, rechazada, cancelada o todas
+      tags:
+      - entities
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invitacion'
+          description: ''
+    post:
+      operationId: entities_invitations_create
+      description: |-
+        Invitaciones de una entidad.
+
+        - GET: quien puede ver miembros. Por defecto las pendientes (`?estado=` otro estado o `todas`).
+        - POST: invita a una cuenta que ya existe, con un rol de nivel menor al propio (D-18).
+          La persona la acepta o rechaza desde `/api/invitations/`.
+      parameters:
+      - in: path
+        name: entidad_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - entities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitacionCrearRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitacion'
+          description: ''
+  /api/entities/{entidad_id}/invitations/{id}/:
+    delete:
+      operationId: entities_invitations_destroy
+      description: 'Cancela una invitación pendiente (`DELETE`): la invitación se
+        conserva como cancelada.'
+      parameters:
+      - in: path
+        name: entidad_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - entities
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/entities/{entidad_id}/members/:
     get:
       operationId: entities_members_list
@@ -278,9 +537,14 @@ paths:
 
         - GET: Admin o quien tenga `entities.view_members`. Por defecto solo los activos
           (`?activa=false` los inactivos, `?activa=todas` todos).
-        - POST: crea la cuenta de una persona nueva o suma una existente, con un rol de nivel menor
-          al propio (D-18). Si la persona ya fue miembro y está inactiva, se reactiva.
+        - POST: crea la cuenta de una persona nueva y la suma con un rol de nivel menor al propio
+          (D-18). Para una cuenta que ya existe se usa una invitación (`/invitations/`, D-27).
       parameters:
+      - in: query
+        name: activa
+        schema:
+          type: string
+        description: true (defecto), false o todas
       - in: path
         name: entidad_id
         schema:
@@ -306,8 +570,8 @@ paths:
 
         - GET: Admin o quien tenga `entities.view_members`. Por defecto solo los activos
           (`?activa=false` los inactivos, `?activa=todas` todos).
-        - POST: crea la cuenta de una persona nueva o suma una existente, con un rol de nivel menor
-          al propio (D-18). Si la persona ya fue miembro y está inactiva, se reactiva.
+        - POST: crea la cuenta de una persona nueva y la suma con un rol de nivel menor al propio
+          (D-18). Para una cuenta que ya existe se usa una invitación (`/invitations/`, D-27).
       parameters:
       - in: path
         name: entidad_id
@@ -320,7 +584,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MiembroRequest'
+              $ref: '#/components/schemas/MiembroCrearRequest'
         required: true
       security:
       - jwtAuth: []
@@ -426,9 +690,13 @@ paths:
       description: |-
         Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
 
-        - Crear: solo el Admin (`entities.manage_entities`).
-        - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
-        - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+        - Cada entidad pertenece a un portafolio (D-29). Se ven las propias (membresía) y las de los
+          portafolios donde se tiene permiso de verlas; el Admin ve todas.
+        - Crear: Admin, Moderador (en su portafolio personal si no elige otro) o quien tenga
+          `create_portfolio_entities` en el portafolio elegido.
+        - Editar nombre y descripción: quien tenga `edit_portfolio_entities` en el portafolio o
+          `entities.edit_entity` en ella.
+        - Archivar o reactivar (`estado`) y mover (`/move/`): según permisos del portafolio. No hay DELETE.
       parameters:
       - in: path
         name: id
@@ -452,9 +720,13 @@ paths:
       description: |-
         Entidades. Cada persona ve solo las suyas; el Admin y el superusuario ven todas.
 
-        - Crear: solo el Admin (`entities.manage_entities`).
-        - Editar nombre y descripción: Admin o quien tenga `entities.edit_entity` en esa entidad.
-        - Archivar o reactivar (`estado`): solo el Admin. No hay DELETE.
+        - Cada entidad pertenece a un portafolio (D-29). Se ven las propias (membresía) y las de los
+          portafolios donde se tiene permiso de verlas; el Admin ve todas.
+        - Crear: Admin, Moderador (en su portafolio personal si no elige otro) o quien tenga
+          `create_portfolio_entities` en el portafolio elegido.
+        - Editar nombre y descripción: quien tenga `edit_portfolio_entities` en el portafolio o
+          `entities.edit_entity` en ella.
+        - Archivar o reactivar (`estado`) y mover (`/move/`): según permisos del portafolio. No hay DELETE.
       parameters:
       - in: path
         name: id
@@ -469,6 +741,36 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedEntidadRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entidad'
+          description: ''
+  /api/entities/{id}/move/:
+    post:
+      operationId: entities_move_create
+      description: |-
+        Cambia la entidad de portafolio: hace falta poder moverla en el origen y crear
+        entidades en el destino (el Admin puede con cualquiera).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este entidad.
+        required: true
+      tags:
+      - entities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoverEntidadRequest'
+        required: true
       security:
       - jwtAuth: []
       responses:
@@ -595,6 +897,65 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/invitations/:
+    get:
+      operationId: invitations_list
+      description: Invitaciones pendientes de quien consulta (para aceptarlas o rechazarlas).
+      tags:
+      - invitations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invitacion'
+          description: ''
+  /api/invitations/{id}/accept/:
+    post:
+      operationId: invitations_accept_create
+      description: 'Acepta: se crea (o reactiva) la membresía con el rol de la invitación.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - invitations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitacion'
+          description: ''
+  /api/invitations/{id}/reject/:
+    post:
+      operationId: invitations_reject_create
+      description: 'Rechaza: no se crea ninguna membresía.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - invitations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitacion'
+          description: ''
   /api/permissions/:
     get:
       operationId: permissions_list
@@ -613,17 +974,435 @@ paths:
                 items:
                   $ref: '#/components/schemas/PermisoCatalogo'
           description: ''
+  /api/portfolio-invitations/:
+    get:
+      operationId: portfolio_invitations_list
+      description: Invitaciones a portafolios pendientes de quien consulta.
+      tags:
+      - portfolio-invitations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvitacionPortafolio'
+          description: ''
+  /api/portfolio-invitations/{id}/accept/:
+    post:
+      operationId: portfolio_invitations_accept_create
+      description: 'Acepta: se crea (o reactiva) la membresía con el rol de la invitación.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - portfolio-invitations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitacionPortafolio'
+          description: ''
+  /api/portfolio-invitations/{id}/reject/:
+    post:
+      operationId: portfolio_invitations_reject_create
+      description: 'Rechaza: no se crea ninguna membresía.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - portfolio-invitations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitacionPortafolio'
+          description: ''
+  /api/portfolios/:
+    get:
+      operationId: portfolios_list
+      description: |-
+        Portafolios: grupos de entidades gestionados en conjunto (D-29).
+
+        - Cada persona ve aquellos donde es miembro; el Admin ve todos.
+        - Crear: Admin o Moderador (`entities.create_entity`). Quien crea queda como Gestor.
+        - Editar y eliminar (solo si está vacío y no es personal): `entities.edit_portfolio`.
+      tags:
+      - portfolios
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Portafolio'
+          description: ''
+    post:
+      operationId: portfolios_create
+      description: |-
+        Portafolios: grupos de entidades gestionados en conjunto (D-29).
+
+        - Cada persona ve aquellos donde es miembro; el Admin ve todos.
+        - Crear: Admin o Moderador (`entities.create_entity`). Quien crea queda como Gestor.
+        - Editar y eliminar (solo si está vacío y no es personal): `entities.edit_portfolio`.
+      tags:
+      - portfolios
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PortafolioRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Portafolio'
+          description: ''
+  /api/portfolios/{id}/:
+    get:
+      operationId: portfolios_retrieve
+      description: |-
+        Portafolios: grupos de entidades gestionados en conjunto (D-29).
+
+        - Cada persona ve aquellos donde es miembro; el Admin ve todos.
+        - Crear: Admin o Moderador (`entities.create_entity`). Quien crea queda como Gestor.
+        - Editar y eliminar (solo si está vacío y no es personal): `entities.edit_portfolio`.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este portafolio.
+        required: true
+      tags:
+      - portfolios
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Portafolio'
+          description: ''
+    patch:
+      operationId: portfolios_partial_update
+      description: |-
+        Portafolios: grupos de entidades gestionados en conjunto (D-29).
+
+        - Cada persona ve aquellos donde es miembro; el Admin ve todos.
+        - Crear: Admin o Moderador (`entities.create_entity`). Quien crea queda como Gestor.
+        - Editar y eliminar (solo si está vacío y no es personal): `entities.edit_portfolio`.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este portafolio.
+        required: true
+      tags:
+      - portfolios
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPortafolioRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Portafolio'
+          description: ''
+    delete:
+      operationId: portfolios_destroy
+      description: |-
+        Portafolios: grupos de entidades gestionados en conjunto (D-29).
+
+        - Cada persona ve aquellos donde es miembro; el Admin ve todos.
+        - Crear: Admin o Moderador (`entities.create_entity`). Quien crea queda como Gestor.
+        - Editar y eliminar (solo si está vacío y no es personal): `entities.edit_portfolio`.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este portafolio.
+        required: true
+      tags:
+      - portfolios
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/portfolios/{portafolio_id}/assignable-roles/:
+    get:
+      operationId: portfolios_assignable_roles_list
+      description: Roles de portafolio que quien consulta puede asignar (nivel igual
+        o menor al propio).
+      parameters:
+      - in: path
+        name: portafolio_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - portfolios
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RolAsignable'
+          description: ''
+  /api/portfolios/{portafolio_id}/invitations/:
+    get:
+      operationId: portfolios_invitations_list
+      description: |-
+        Invitaciones de un portafolio.
+
+        - GET: quien ve sus miembros. Por defecto las pendientes (`?estado=` otro estado o `todas`).
+        - POST: invita a una cuenta que ya existe con un rol de portafolio de nivel igual o menor al
+          propio. La persona la acepta o rechaza desde `/api/portfolio-invitations/`.
+      parameters:
+      - in: query
+        name: estado
+        schema:
+          type: string
+        description: pendiente (defecto), aceptada, rechazada, cancelada o todas
+      - in: path
+        name: portafolio_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - portfolios
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvitacionPortafolio'
+          description: ''
+    post:
+      operationId: portfolios_invitations_create
+      description: |-
+        Invitaciones de un portafolio.
+
+        - GET: quien ve sus miembros. Por defecto las pendientes (`?estado=` otro estado o `todas`).
+        - POST: invita a una cuenta que ya existe con un rol de portafolio de nivel igual o menor al
+          propio. La persona la acepta o rechaza desde `/api/portfolio-invitations/`.
+      parameters:
+      - in: path
+        name: portafolio_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - portfolios
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitacionPortafolioCrearRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitacionPortafolio'
+          description: ''
+  /api/portfolios/{portafolio_id}/invitations/{id}/:
+    delete:
+      operationId: portfolios_invitations_destroy
+      description: 'Cancela una invitación pendiente (`DELETE`): queda como cancelada.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: portafolio_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - portfolios
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/portfolios/{portafolio_id}/members/:
+    get:
+      operationId: portfolios_members_list
+      description: |-
+        Miembros de un portafolio. Quien lo ve puede ver sus miembros.
+
+        Por defecto solo los activos (`?activa=false` los inactivos, `?activa=todas` todos). Se suman
+        por invitación (`/invitations/`).
+      parameters:
+      - in: query
+        name: activa
+        schema:
+          type: string
+        description: true (defecto), false o todas
+      - in: path
+        name: portafolio_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - portfolios
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PortafolioMiembro'
+          description: ''
+  /api/portfolios/{portafolio_id}/members/{id}/:
+    get:
+      operationId: portfolios_members_retrieve
+      description: |-
+        Un miembro del portafolio: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+
+        Hace falta `entities.manage_portfolio_members` y un nivel igual o mayor al del rol. Nadie
+        modifica su propia membresía (salvo el Admin) y el portafolio conserva siempre un Gestor activo.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: portafolio_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - portfolios
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortafolioMiembro'
+          description: ''
+    patch:
+      operationId: portfolios_members_partial_update
+      description: |-
+        Un miembro del portafolio: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+
+        Hace falta `entities.manage_portfolio_members` y un nivel igual o mayor al del rol. Nadie
+        modifica su propia membresía (salvo el Admin) y el portafolio conserva siempre un Gestor activo.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: portafolio_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - portfolios
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPortafolioMiembroEditarRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortafolioMiembro'
+          description: ''
+    delete:
+      operationId: portfolios_members_destroy
+      description: |-
+        Un miembro del portafolio: ver, cambiar su rol o activarlo y desactivarlo (DELETE desactiva).
+
+        Hace falta `entities.manage_portfolio_members` y un nivel igual o mayor al del rol. Nadie
+        modifica su propia membresía (salvo el Admin) y el portafolio conserva siempre un Gestor activo.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: portafolio_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - portfolios
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/roles/:
     get:
       operationId: roles_list
       description: |-
         Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
 
-        - `Admin` es del sistema y global: no se edita ni se borra.
-        - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+        - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+        - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+          `Coordinador`) son del sistema: se editan sus permisos,
           pero no se renombran ni se borran.
-        - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-          catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+        - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+          reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
       tags:
       - roles
       security:
@@ -642,11 +1421,12 @@ paths:
       description: |-
         Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
 
-        - `Admin` es del sistema y global: no se edita ni se borra.
-        - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+        - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+        - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+          `Coordinador`) son del sistema: se editan sus permisos,
           pero no se renombran ni se borran.
-        - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-          catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+        - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+          reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
       tags:
       - roles
       requestBody:
@@ -670,11 +1450,12 @@ paths:
       description: |-
         Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
 
-        - `Admin` es del sistema y global: no se edita ni se borra.
-        - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+        - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+        - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+          `Coordinador`) son del sistema: se editan sus permisos,
           pero no se renombran ni se borran.
-        - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-          catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+        - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+          reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
       parameters:
       - in: path
         name: id
@@ -698,11 +1479,12 @@ paths:
       description: |-
         Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
 
-        - `Admin` es del sistema y global: no se edita ni se borra.
-        - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+        - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+        - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+          `Coordinador`) son del sistema: se editan sus permisos,
           pero no se renombran ni se borran.
-        - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-          catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+        - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+          reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
       parameters:
       - in: path
         name: id
@@ -731,11 +1513,12 @@ paths:
       description: |-
         Gestión de roles y de sus permisos (solo con `accounts.manage_roles`, es decir, el Admin).
 
-        - `Admin` es del sistema y global: no se edita ni se borra.
-        - `Planificador`, `Operario de campo` y `Auditor` son del sistema: se editan sus permisos,
+        - `Admin` y `Moderador` son del sistema y globales: no se editan ni se borran.
+        - `Planificador`, `Colaborador`, `Auditor` y los de portafolio (`Gestor del portafolio`,
+          `Coordinador`) son del sistema: se editan sus permisos,
           pero no se renombran ni se borran.
-        - Los roles que se creen son siempre por entidad y solo reciben permisos por entidad del
-          catálogo (`/api/permissions/`); un permiso global nunca se asigna (D-16).
+        - Los roles que se creen son por entidad (por defecto) o por portafolio (`ambito`) y solo
+          reciben permisos de su ámbito (`/api/permissions/`); un permiso global nunca se asigna (D-16).
       parameters:
       - in: path
         name: id
@@ -880,6 +1663,41 @@ paths:
           description: No response body
 components:
   schemas:
+    AmbitoEnum:
+      enum:
+      - entidad
+      - portafolio
+      type: string
+      description: |-
+        * `entidad` - entidad
+        * `portafolio` - portafolio
+    Candidato:
+      type: object
+      description: Una cuenta que se puede sumar a la entidad (resultado de la búsqueda).
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+      required:
+      - first_name
+      - id
+      - last_name
+      - username
+    CategoriaEnum:
+      enum:
+      - sistema
+      - entidad
+      - contenido
+      type: string
+      description: |-
+        * `sistema` - Sistema
+        * `entidad` - Entidad
+        * `contenido` - Contenido
     ChangePasswordRequest:
       type: object
       properties:
@@ -891,6 +1709,7 @@ components:
           type: string
           writeOnly: true
           minLength: 1
+          maxLength: 128
       required:
       - new_password
       - old_password
@@ -906,6 +1725,11 @@ components:
         tipo_nombre:
           type: string
           readOnly: true
+        portafolio:
+          type: integer
+        portafolio_nombre:
+          type: string
+          readOnly: true
         nombre:
           type: string
           maxLength: 120
@@ -913,12 +1737,30 @@ components:
           type: string
           title: Descripción
         estado:
-          $ref: '#/components/schemas/EstadoEnum'
+          $ref: '#/components/schemas/EntidadEstadoEnum'
         mi_rol:
           type: string
           nullable: true
           description: Nombre del rol del usuario en la entidad (null si no es miembro,
             p. ej. el Admin).
+          readOnly: true
+        puede_editar:
+          type: boolean
+          readOnly: true
+        puede_ver_miembros:
+          type: boolean
+          readOnly: true
+        puede_gestionar_miembros:
+          type: boolean
+          readOnly: true
+        puede_ver_historial:
+          type: boolean
+          readOnly: true
+        puede_archivar:
+          type: boolean
+          readOnly: true
+        puede_mover:
+          type: boolean
           readOnly: true
         creado_por:
           type: integer
@@ -934,13 +1776,30 @@ components:
       - id
       - mi_rol
       - nombre
+      - portafolio_nombre
+      - puede_archivar
+      - puede_editar
+      - puede_gestionar_miembros
+      - puede_mover
+      - puede_ver_historial
+      - puede_ver_miembros
       - tipo
       - tipo_nombre
+    EntidadEstadoEnum:
+      enum:
+      - activa
+      - archivada
+      type: string
+      description: |-
+        * `activa` - Activa
+        * `archivada` - Archivada
     EntidadRequest:
       type: object
       description: Una entidad. El tipo se elige al crear y no cambia después (D-19).
       properties:
         tipo:
+          type: integer
+        portafolio:
           type: integer
         nombre:
           type: string
@@ -950,18 +1809,267 @@ components:
           type: string
           title: Descripción
         estado:
-          $ref: '#/components/schemas/EstadoEnum'
+          $ref: '#/components/schemas/EntidadEstadoEnum'
       required:
       - nombre
       - tipo
-    EstadoEnum:
+    EstadoInvitacionEnum:
       enum:
-      - activa
-      - archivada
+      - pendiente
+      - aceptada
+      - rechazada
+      - cancelada
       type: string
       description: |-
-        * `activa` - Activa
-        * `archivada` - Archivada
+        * `pendiente` - Pendiente
+        * `aceptada` - Aceptada
+        * `rechazada` - Rechazada
+        * `cancelada` - Cancelada
+    EventoAuditoria:
+      type: object
+      description: Un evento del historial. Todo es de solo lectura.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        ocurrido_en:
+          type: string
+          format: date-time
+          readOnly: true
+        categoria:
+          allOf:
+          - $ref: '#/components/schemas/CategoriaEnum'
+          readOnly: true
+        categoria_nombre:
+          type: string
+          readOnly: true
+        accion:
+          type: string
+          readOnly: true
+        usuario_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        usuario_nombre:
+          type: string
+          readOnly: true
+        ip:
+          type: string
+          readOnly: true
+          nullable: true
+        entidad_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        entidad_nombre:
+          type: string
+          readOnly: true
+        portafolio_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        portafolio_nombre:
+          type: string
+          readOnly: true
+        objeto_tipo:
+          type: string
+          readOnly: true
+        objeto_id:
+          type: string
+          readOnly: true
+        objeto_nombre:
+          type: string
+          readOnly: true
+        cambios:
+          readOnly: true
+        detalle:
+          readOnly: true
+      required:
+      - accion
+      - cambios
+      - categoria
+      - categoria_nombre
+      - detalle
+      - entidad_id
+      - entidad_nombre
+      - id
+      - ip
+      - objeto_id
+      - objeto_nombre
+      - objeto_tipo
+      - ocurrido_en
+      - portafolio_id
+      - portafolio_nombre
+      - usuario_id
+      - usuario_nombre
+    Invitacion:
+      type: object
+      description: Una invitación, con lo necesario para mostrarla a quien la envía
+        y a quien la recibe.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        entidad:
+          type: integer
+          readOnly: true
+        entidad_nombre:
+          type: string
+          readOnly: true
+        tipo_nombre:
+          type: string
+          readOnly: true
+        usuario:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+        first_name:
+          type: string
+          readOnly: true
+        last_name:
+          type: string
+          readOnly: true
+        rol:
+          type: integer
+          readOnly: true
+        rol_nombre:
+          type: string
+          readOnly: true
+        invitado_por:
+          type: integer
+          readOnly: true
+          nullable: true
+        invitado_por_nombre:
+          type: string
+          readOnly: true
+        estado:
+          allOf:
+          - $ref: '#/components/schemas/EstadoInvitacionEnum'
+          readOnly: true
+          default: pendiente
+        creado_en:
+          type: string
+          format: date-time
+          readOnly: true
+        respondido_en:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - creado_en
+      - entidad
+      - entidad_nombre
+      - estado
+      - first_name
+      - id
+      - invitado_por
+      - invitado_por_nombre
+      - last_name
+      - respondido_en
+      - rol
+      - rol_nombre
+      - tipo_nombre
+      - username
+      - usuario
+    InvitacionCrearRequest:
+      type: object
+      description: Invita a una cuenta que ya existe a unirse a la entidad con un
+        rol.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Nombre de usuario de la cuenta a invitar.
+        rol:
+          type: integer
+      required:
+      - rol
+      - username
+    InvitacionPortafolio:
+      type: object
+      description: Una invitación a un portafolio, para quien la envía y para quien
+        la recibe.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        portafolio:
+          type: integer
+          readOnly: true
+        portafolio_nombre:
+          type: string
+          readOnly: true
+        usuario:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+        first_name:
+          type: string
+          readOnly: true
+        last_name:
+          type: string
+          readOnly: true
+        rol:
+          type: integer
+          readOnly: true
+        rol_nombre:
+          type: string
+          readOnly: true
+        invitado_por:
+          type: integer
+          readOnly: true
+          nullable: true
+        invitado_por_nombre:
+          type: string
+          readOnly: true
+        estado:
+          allOf:
+          - $ref: '#/components/schemas/EstadoInvitacionEnum'
+          readOnly: true
+          default: pendiente
+        creado_en:
+          type: string
+          format: date-time
+          readOnly: true
+        respondido_en:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - creado_en
+      - estado
+      - first_name
+      - id
+      - invitado_por
+      - invitado_por_nombre
+      - last_name
+      - portafolio
+      - portafolio_nombre
+      - respondido_en
+      - rol
+      - rol_nombre
+      - username
+      - usuario
+    InvitacionPortafolioCrearRequest:
+      type: object
+      description: Invita a una cuenta que ya existe a unirse al portafolio con un
+        rol.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Nombre de usuario de la cuenta a invitar.
+        rol:
+          type: integer
+      required:
+      - rol
+      - username
     LogoutRequest:
       type: object
       description: Invalida (lista negra) el refresh token recibido.
@@ -971,6 +2079,92 @@ components:
           minLength: 1
       required:
       - refresh
+    Me:
+      type: object
+      description: |-
+        Perfil propio, con lo que la web necesita para decidir qué menús mostrar.
+
+        Es solo informativo: el backend sigue aplicando todos los permisos en cada endpoint.
+        Los permisos de cada entidad (y el rol en ella) llegan en `/api/entities/`.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          title: Nombre de usuario
+          description: 'Requerido. 150 carácteres como máximo. Únicamente letras,
+            dígitos y @/./+/-/_ '
+        email:
+          nullable: true
+          title: Correo electrónico
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        first_name:
+          type: string
+          title: Nombre
+          maxLength: 150
+        last_name:
+          type: string
+          title: Apellidos
+          maxLength: 150
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Fecha de alta
+        is_admin:
+          type: boolean
+          readOnly: true
+        is_moderator:
+          type: boolean
+          readOnly: true
+        is_superuser:
+          type: boolean
+          readOnly: true
+        global_permissions:
+          type: array
+          items:
+            type: string
+          readOnly: true
+      required:
+      - date_joined
+      - global_permissions
+      - id
+      - is_admin
+      - is_moderator
+      - is_superuser
+      - username
+    MeRequest:
+      type: object
+      description: |-
+        Perfil propio, con lo que la web necesita para decidir qué menús mostrar.
+
+        Es solo informativo: el backend sigue aplicando todos los permisos en cada endpoint.
+        Los permisos de cada entidad (y el rol en ella) llegan en `/api/entities/`.
+      properties:
+        email:
+          nullable: true
+          title: Correo electrónico
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        first_name:
+          type: string
+          title: Nombre
+          maxLength: 150
+        last_name:
+          type: string
+          title: Apellidos
+          maxLength: 150
     Miembro:
       type: object
       description: Una membresía, con los datos básicos de la persona y su rol.
@@ -1019,19 +2213,30 @@ components:
       - rol_nombre
       - username
       - usuario
-    MiembroRequest:
+    MiembroCrearRequest:
       type: object
-      description: Una membresía, con los datos básicos de la persona y su rol.
+      description: |-
+        Crea la cuenta de una persona nueva y la suma a la entidad con un rol.
+
+        Para una cuenta que ya existe se usa una invitación (`InvitacionCrearSerializer`, D-27).
       properties:
-        usuario:
-          type: integer
+        new_user:
+          allOf:
+          - $ref: '#/components/schemas/RegisterRequest'
+          description: Datos para crear la cuenta.
         rol:
           type: integer
-        activa:
-          type: boolean
       required:
+      - new_user
       - rol
-      - usuario
+    MoverEntidadRequest:
+      type: object
+      description: Cambia una entidad de portafolio (D-29).
+      properties:
+        portafolio:
+          type: integer
+      required:
+      - portafolio
     PaginatedEntidadList:
       type: object
       required:
@@ -1055,6 +2260,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Entidad'
+    PaginatedEventoAuditoriaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventoAuditoria'
     PaginatedUserAdminList:
       type: object
       required:
@@ -1084,6 +2312,8 @@ components:
       properties:
         tipo:
           type: integer
+        portafolio:
+          type: integer
         nombre:
           type: string
           minLength: 1
@@ -1092,7 +2322,32 @@ components:
           type: string
           title: Descripción
         estado:
-          $ref: '#/components/schemas/EstadoEnum'
+          $ref: '#/components/schemas/EntidadEstadoEnum'
+    PatchedMeRequest:
+      type: object
+      description: |-
+        Perfil propio, con lo que la web necesita para decidir qué menús mostrar.
+
+        Es solo informativo: el backend sigue aplicando todos los permisos en cada endpoint.
+        Los permisos de cada entidad (y el rol en ella) llegan en `/api/entities/`.
+      properties:
+        email:
+          nullable: true
+          title: Correo electrónico
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        first_name:
+          type: string
+          title: Nombre
+          maxLength: 150
+        last_name:
+          type: string
+          title: Apellidos
+          maxLength: 150
     PatchedMiembroEditarRequest:
       type: object
       description: Cambia el rol de un miembro o lo activa o desactiva.
@@ -1101,6 +2356,26 @@ components:
           type: integer
         activa:
           type: boolean
+    PatchedPortafolioMiembroEditarRequest:
+      type: object
+      description: Cambia el rol de un miembro del portafolio o lo activa o desactiva.
+      properties:
+        rol:
+          type: integer
+        activa:
+          type: boolean
+    PatchedPortafolioRequest:
+      type: object
+      description: Un portafolio, con lo que la persona que consulta puede hacer en
+        él.
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 120
+        descripcion:
+          type: string
+          title: Descripción
     PatchedRoleRequest:
       type: object
       description: Roles (`Group`) y sus permisos. Solo `Admin` es global; los demás
@@ -1111,6 +2386,10 @@ components:
           minLength: 1
           title: Nombre
           maxLength: 150
+        ambito:
+          allOf:
+          - $ref: '#/components/schemas/AmbitoEnum'
+          writeOnly: true
         nivel:
           type: integer
           maximum: 99
@@ -1141,9 +2420,6 @@ components:
         admite_tareas:
           type: boolean
           title: Admite tareas y Gantt
-        es_filtro_contexto:
-          type: boolean
-          title: Sirve de filtro de contexto en el móvil
         activo:
           type: boolean
     PatchedUserAdminRequest:
@@ -1153,6 +2429,7 @@ components:
 
         - `username` solo se define al crear; la contraseña solo se define al crear.
         - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+        - `is_moderator` (rol global Moderador, D-28) lo cambia quien gestiona usuarios (Admin o superusuario).
         - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
       properties:
         username:
@@ -1187,31 +2464,13 @@ components:
             esta opción en lugar de borrar la cuenta.
         is_admin:
           type: boolean
+        is_moderator:
+          type: boolean
         password:
           type: string
           writeOnly: true
           minLength: 1
-    PatchedUserRequest:
-      type: object
-      description: Perfil del usuario autenticado. El username no se puede cambiar.
-      properties:
-        email:
-          nullable: true
-          title: Correo electrónico
-          oneOf:
-          - type: string
-            format: email
-            maxLength: 254
-          - type: string
-            maxLength: 0
-        first_name:
-          type: string
-          title: Nombre
-          maxLength: 150
-        last_name:
-          type: string
-          title: Apellidos
-          maxLength: 150
+          maxLength: 128
     PermisoCatalogo:
       type: object
       description: Un permiso del catálogo (solo lectura).
@@ -1225,6 +2484,137 @@ components:
       required:
       - ambito
       - codename
+      - nombre
+    Portafolio:
+      type: object
+      description: Un portafolio, con lo que la persona que consulta puede hacer en
+        él.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        nombre:
+          type: string
+          maxLength: 120
+        descripcion:
+          type: string
+          title: Descripción
+        personal:
+          type: boolean
+          readOnly: true
+        total_entidades:
+          type: integer
+          readOnly: true
+        mi_rol:
+          type: string
+          nullable: true
+          readOnly: true
+        puede_editar:
+          type: boolean
+          readOnly: true
+        puede_eliminar:
+          type: boolean
+          readOnly: true
+        puede_crear_entidades:
+          type: boolean
+          readOnly: true
+        puede_ver_miembros:
+          type: boolean
+          readOnly: true
+        puede_gestionar_miembros:
+          type: boolean
+          readOnly: true
+        puede_ver_historial:
+          type: boolean
+          readOnly: true
+        creado_por:
+          type: integer
+          readOnly: true
+          nullable: true
+        creado_en:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - creado_en
+      - creado_por
+      - id
+      - mi_rol
+      - nombre
+      - personal
+      - puede_crear_entidades
+      - puede_editar
+      - puede_eliminar
+      - puede_gestionar_miembros
+      - puede_ver_historial
+      - puede_ver_miembros
+      - total_entidades
+    PortafolioMiembro:
+      type: object
+      description: Una membresía de portafolio, con los datos básicos de la persona
+        y su rol.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        usuario:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+        first_name:
+          type: string
+          readOnly: true
+        last_name:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        rol:
+          type: integer
+          readOnly: true
+        rol_nombre:
+          type: string
+          readOnly: true
+        nivel:
+          type: integer
+          nullable: true
+          readOnly: true
+        activa:
+          type: boolean
+          readOnly: true
+        creado_en:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - activa
+      - creado_en
+      - email
+      - first_name
+      - id
+      - last_name
+      - nivel
+      - rol
+      - rol_nombre
+      - username
+      - usuario
+    PortafolioRequest:
+      type: object
+      description: Un portafolio, con lo que la persona que consulta puede hacer en
+        él.
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 120
+        descripcion:
+          type: string
+          title: Descripción
+      required:
       - nombre
     Register:
       type: object
@@ -1283,6 +2673,7 @@ components:
           type: string
           writeOnly: true
           minLength: 1
+          maxLength: 128
         first_name:
           type: string
           title: Nombre
@@ -1294,6 +2685,21 @@ components:
       required:
       - password
       - username
+    RolAsignable:
+      type: object
+      description: Un rol que quien consulta puede asignar en la entidad (para los
+        formularios de miembros).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        nivel:
+          type: integer
+      required:
+      - id
+      - name
+      - nivel
     Role:
       type: object
       description: Roles (`Group`) y sus permisos. Solo `Admin` es global; los demás
@@ -1341,6 +2747,10 @@ components:
           minLength: 1
           title: Nombre
           maxLength: 150
+        ambito:
+          allOf:
+          - $ref: '#/components/schemas/AmbitoEnum'
+          writeOnly: true
         nivel:
           type: integer
           maximum: 99
@@ -1374,9 +2784,6 @@ components:
         admite_tareas:
           type: boolean
           title: Admite tareas y Gantt
-        es_filtro_contexto:
-          type: boolean
-          title: Sirve de filtro de contexto en el móvil
         activo:
           type: boolean
         total_entidades:
@@ -1402,9 +2809,6 @@ components:
         admite_tareas:
           type: boolean
           title: Admite tareas y Gantt
-        es_filtro_contexto:
-          type: boolean
-          title: Sirve de filtro de contexto en el móvil
         activo:
           type: boolean
       required:
@@ -1453,45 +2857,6 @@ components:
           minLength: 1
       required:
       - refresh
-    User:
-      type: object
-      description: Perfil del usuario autenticado. El username no se puede cambiar.
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        username:
-          type: string
-          readOnly: true
-          title: Nombre de usuario
-          description: 'Requerido. 150 carácteres como máximo. Únicamente letras,
-            dígitos y @/./+/-/_ '
-        email:
-          nullable: true
-          title: Correo electrónico
-          oneOf:
-          - type: string
-            format: email
-            maxLength: 254
-          - type: string
-            maxLength: 0
-        first_name:
-          type: string
-          title: Nombre
-          maxLength: 150
-        last_name:
-          type: string
-          title: Apellidos
-          maxLength: 150
-        date_joined:
-          type: string
-          format: date-time
-          readOnly: true
-          title: Fecha de alta
-      required:
-      - date_joined
-      - id
-      - username
     UserAdmin:
       type: object
       description: |-
@@ -1499,6 +2864,7 @@ components:
 
         - `username` solo se define al crear; la contraseña solo se define al crear.
         - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+        - `is_moderator` (rol global Moderador, D-28) lo cambia quien gestiona usuarios (Admin o superusuario).
         - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
       properties:
         id:
@@ -1534,6 +2900,8 @@ components:
           description: Indica si el usuario debe ser tratado como activo. Desmarque
             esta opción en lugar de borrar la cuenta.
         is_admin:
+          type: boolean
+        is_moderator:
           type: boolean
         failed_attempts:
           type: integer
@@ -1567,6 +2935,7 @@ components:
 
         - `username` solo se define al crear; la contraseña solo se define al crear.
         - `is_admin` (rol global Admin) solo lo cambia un superusuario (D-16).
+        - `is_moderator` (rol global Moderador, D-28) lo cambia quien gestiona usuarios (Admin o superusuario).
         - `is_staff` e `is_superuser` no existen aquí: nunca se pueden dar por la API.
       properties:
         username:
@@ -1601,33 +2970,15 @@ components:
             esta opción en lugar de borrar la cuenta.
         is_admin:
           type: boolean
+        is_moderator:
+          type: boolean
         password:
           type: string
           writeOnly: true
           minLength: 1
+          maxLength: 128
       required:
       - username
-    UserRequest:
-      type: object
-      description: Perfil del usuario autenticado. El username no se puede cambiar.
-      properties:
-        email:
-          nullable: true
-          title: Correo electrónico
-          oneOf:
-          - type: string
-            format: email
-            maxLength: 254
-          - type: string
-            maxLength: 0
-        first_name:
-          type: string
-          title: Nombre
-          maxLength: 150
-        last_name:
-          type: string
-          title: Apellidos
-          maxLength: 150
   securitySchemes:
     jwtAuth:
       type: http

@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "accounts",
     "entities",
+    "audit",
 ]
 
 MIDDLEWARE = [
@@ -179,6 +180,10 @@ SIMPLE_JWT = {
 LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "3"))
 LOGIN_LOCKOUT_MINUTES = int(os.environ.get("LOGIN_LOCKOUT_MINUTES", "15"))
 
+# Auditoría (D-21): solo se confía en la cabecera X-Forwarded-For si hay un proxy propio delante
+# (Nginx). Sin él, cualquiera podría falsear la IP que queda registrada.
+AUDIT_TRUST_PROXY = os.environ.get("AUDIT_TRUST_PROXY", "false").lower() == "true"
+
 # CORS: orígenes del front web (Vite). La app móvil no usa CORS.
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
@@ -191,4 +196,6 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    # Un nombre estable para los estados de invitación (se repiten en entidades y portafolios).
+    "ENUM_NAME_OVERRIDES": {"EstadoInvitacionEnum": "entities.models.Invitacion.Estado"},
 }

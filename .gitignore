@@ -12,3 +12,4 @@ __pycache__/
 *.pyc
 .ruff_cache/
 /web/dist
+Pruebas_Valores_Limite_Registro.docx
